@@ -7,6 +7,7 @@
  *   node scripts/release.js --dry-run      只打印计划，不联网写任何数据
  *   node scripts/release.js --notes "..."  自定义发布说明
  *   node scripts/release.js --clobber      同名附件已存在时删掉重传
+ *   node scripts/release.js --prune        顺带清掉不在本次清单里的旧附件
  *
  * 凭据顺序：GH_TOKEN / GITHUB_TOKEN 环境变量 → 本机 git 已登录的凭据。
  * 仓库地址从 git remote origin 解析，不写死。
@@ -34,6 +35,7 @@ const valOf = (f) => {
 const DRY = has('--dry-run')
 const DRAFT = has('--draft')
 const CLOBBER = has('--clobber')
+const PRUNE = has('--prune')
 const TAG = valOf('--tag') || `v${VERSION}`
 const NOTES_ARG = valOf('--notes')
 
@@ -76,21 +78,39 @@ const fmtMB = (n) => `${(n / 1048576).toFixed(1)} MB`
 
 /* ---------- 清单 ---------- */
 
-// GitHub 会把附件名里的空格换成点号，而 latest.yml 里写的是连字符版本，
-// 两边必须对上，否则 electron-updater 找不到文件。
-const safeName = (n) => n.replace(/ /g, '-')
+// GitHub 不接受附件名里的空格（会被转成点号），产物名统一用下划线。
+const safeName = (n) => n.replace(/ /g, '_')
 
-function collectAssets() {
-  const exeName = `${PRODUCT} Setup ${VERSION}.exe`
-  const exePath = path.join(DIST, exeName)
-  if (!fs.existsSync(exePath)) {
-    const alt = path.join(DIST, `${PRODUCT}-Setup-${VERSION}.exe`)
-    if (!fs.existsSync(alt)) {
-      throw new Error(`找不到安装包：${exeName}\n请先执行 npm run dist`)
-    }
-    return buildList(alt)
+// 产物名以 package.json 的 artifactName 模板为准（默认 ${productName}_Setup_${version}.${ext}），
+// 改模板不用动脚本；万一没配或没对上，再退回扫描 dist 目录。
+function artifactName() {
+  const b = pkg.build || {}
+  const tpl = (b.win && b.win.artifactName) || b.artifactName
+  if (!tpl) return null
+  return tpl
+    .replace(/\$\{productName\}/g, PRODUCT)
+    .replace(/\$\{version\}/g, VERSION)
+    .replace(/\$\{ext\}/g, 'exe')
+}
+
+function resolveInstaller() {
+  const named = artifactName()
+  if (named) {
+    const p = path.join(DIST, named)
+    if (fs.existsSync(p)) return p
   }
-  return buildList(exePath)
+  if (!fs.existsSync(DIST)) {
+    throw new Error('找不到 dist 目录，请先执行 npm run dist')
+  }
+  const hit = fs
+    .readdirSync(DIST)
+    .find((f) => f.toLowerCase().endsWith('.exe') && f.includes(VERSION))
+  if (!hit) {
+    throw new Error(
+      `dist 里没有 ${VERSION} 的安装包${named ? `（期望 ${named}）` : ''}\n请先执行 npm run dist`
+    )
+  }
+  return path.join(DIST, hit)
 }
 
 function buildList(exePath) {
@@ -107,12 +127,13 @@ function buildList(exePath) {
 
 function defaultNotes(assets) {
   const lines = assets.map((a) => `- \`${a.name}\` (${fmtMB(a.size)})`)
+  const exe = assets.find((a) => a.name.toLowerCase().endsWith('.exe'))
   return [
     `## DeskDock ${VERSION}`,
     '',
     '### 安装',
     '',
-    `1. 下载 \`${PRODUCT}-Setup-${VERSION}.exe\``,
+    `1. 下载 \`${exe ? exe.name : `${PRODUCT}_Setup_${VERSION}.exe`}\``,
     '2. 双击安装。安装包未签名，Windows 会拦一次，点「更多信息 → 仍要运行」',
     '3. 装完从开始菜单或桌面快捷方式启动，首次运行会在托盘常驻',
     '',
@@ -205,7 +226,7 @@ async function api(repo, token, p, opts = {}) {
 
 async function main() {
   const repo = getRepo()
-  const assets = collectAssets()
+  const assets = buildList(resolveInstaller())
   const notes = NOTES_ARG || defaultNotes(assets)
 
   console.log(`仓库    ${repo.owner}/${repo.repo}`)
@@ -292,6 +313,18 @@ async function main() {
     }
     const url = res.json && res.json.browser_download_url
     process.stdout.write(`\r上传    ${a.name}  完成  ${url || ''}\n`)
+  }
+
+  // 清掉本次清单之外的旧附件（改名、换目标后留下的孤儿）
+  if (PRUNE) {
+    const keep = new Set(assets.map((a) => a.name))
+    for (const [name, asset] of existing) {
+      if (keep.has(name)) continue
+      const del = await api(repo, token, `/releases/assets/${asset.id}`, { method: 'DELETE' })
+      console.log(
+        del.status === 204 ? `清理    ${name}` : `清理失败 ${name}（${del.status}，可能已被删）`
+      )
+    }
   }
 
   console.log(`\n完成：${release.html_url}${DRAFT ? '\n当前是草稿，网页上点「Publish release」即公开。' : ''}`)

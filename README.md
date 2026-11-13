@@ -55,9 +55,12 @@ npm install          # 安装依赖
 npm start            # 开发模式运行
 npm run icon         # 重新生成图标（build/icon.png、build/icon.ico）
 npm run dist         # 打包成安装程序 → dist/
+npm run release      # 把 dist 里的产物发到 GitHub Releases
 ```
 
-打包产物：`dist/DeskDock Setup 1.1.3.exe`（NSIS 安装包，可选安装目录，装完会有桌面和开始菜单快捷方式）。
+打包产物：`dist/DeskDock_Setup_<版本>.exe`（NSIS 安装包，可选安装目录，装完会有桌面和开始菜单快捷方式）。
+
+> 产物名由 `package.json` 的 `build.win.artifactName` 决定，统一用下划线，不带空格——GitHub 上传附件时会把空格转成点号，`latest.yml` 里的下载地址就对不上了。
 
 > 国内网络下载 Electron 慢的话，加上镜像：
 > `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npm install`

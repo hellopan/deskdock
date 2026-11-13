@@ -40,6 +40,7 @@
     ],
     "win": {
       "icon": "build/icon.ico",
+      "artifactName": "${productName}_Setup_${version}.${ext}",
       "target": [
         {
           "target": "nsis",
