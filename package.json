@@ -18,7 +18,8 @@
     "start": "electron .",
     "icon": "node scripts/gen-icon.js",
     "pack": "electron-builder --win --dir",
-    "dist": "electron-builder --win"
+    "dist": "electron-builder --win",
+    "release": "node scripts/release.js"
   },
   "devDependencies": {
     "electron": "^33.4.11",
