@@ -147,6 +147,16 @@ body { background: var(--win-bg); }
 .row-actions { background: transparent; padding: 0; margin: 0 0 10px; min-height: 0; gap: 6px; justify-content: flex-start; flex-wrap: wrap; }
 .row.is-disabled { opacity: .55; }
 .row.is-disabled .rlabel { color: var(--text-dim); }
+/* 只压整行透明度不够：蓝滑块看着还是"能拖"。禁用时滑块与轨道一起退成灰线 */
+.row.is-disabled input[type="range"]::-webkit-slider-runnable-track { background: var(--line); }
+.row.is-disabled input[type="range"]::-webkit-slider-thumb {
+  background: var(--line-strong);
+  box-shadow: none;
+  cursor: default;
+}
+.row.is-disabled .switch .track { background: var(--line-strong); }
+.row.is-disabled .switch input,
+.row.is-disabled button { cursor: default; }
 .rnote { font-size: var(--fs-11); color: var(--muted); margin-top: var(--s1); line-height: 1.5; }
 
 /* 外观预览：按当前 iconSize / tileSize 真实渲染，改滑块当场可见 */
@@ -167,23 +177,48 @@ body { background: var(--win-bg); }
   flex: none;
   display: flex; flex-direction: column; align-items: center; gap: var(--s1);
   min-width: 0;
+  padding: 6px 3px;
+  border-radius: var(--r-sm);
+  transition: background var(--t-fast) ease;
 }
+/* 悬停效果跟坞里的磁贴一致，预览不只是"看数字" */
+.pv-tile:hover { background: var(--surface-3); }
 .pv-ico {
   /* 图标可能比磁贴还宽（64 > 60），用 aspect-ratio 让宽度受限时不变形 */
   width: var(--icon); aspect-ratio: 1; max-width: 100%;
   border-radius: var(--r-sm);
   display: grid; place-items: center;
-  color: #fff; font-size: var(--fs-13); font-weight: 600;
+  background: var(--icon-plate);
+  overflow: hidden;
+  flex: none;
 }
+.pv-ico svg { width: 58%; height: 58%; }
 .pv-label {
   font-size: var(--fs-11); line-height: 1.3; color: var(--text-dim);
-  max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  width: 100%; text-align: center;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; overflow-wrap: anywhere;
 }
+.preview-note { font-size: var(--fs-11); color: var(--muted); margin-top: var(--s2); }
 body.no-label .pv-label { display: none; }
 
 .warn-text { font-size: var(--fs-11); color: var(--danger); line-height: 1.55; margin-top: 6px; }
 .about-name { font-size: var(--fs-13); font-weight: 600; color: var(--text); }
 .about-meta { font-size: var(--fs-11); color: var(--muted); margin-top: 3px; }
+/* 操作提示：一张卡里按行分开，5 条各占一张卡太碎 */
+.tips {
+  padding: 2px 12px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+.tip {
+  display: grid; grid-template-columns: 40px 1fr; gap: var(--s2);
+  padding: 8px 0;
+  font-size: var(--fs-12); line-height: 1.6;
+}
+.tip + .tip { border-top: 1px solid var(--line); }
+.tip-k { font-size: var(--fs-11); color: var(--muted); padding-top: 2px; }
+.tip-v { color: var(--text-dim); }
 .mt-2 { margin-top: var(--s2); }
 
 /* ---------------- 控件 ---------------- */

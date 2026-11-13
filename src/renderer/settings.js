@@ -403,19 +403,36 @@ function buildLookTab(body) {
 }
 
 /** 预览：滑块改了尺寸后能当场看到，不必关掉设置再瞄一眼 */
+const PV_GLYPH = {
+  globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">' +
+    '<circle cx="12" cy="12" r="8"/><ellipse cx="12" cy="12" rx="3.4" ry="8"/>' +
+    '<path d="M4.4 9.4h15.2M4.4 14.6h15.2"/></svg>',
+  terminal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
+    '<rect x="3.2" y="4.6" width="17.6" height="14.8" rx="2.6"/><path d="M7 9.4l2.6 2.6L7 14.6M12.4 15h4.4"/></svg>',
+  pen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M4 20l1.2-4.6L16.4 4.2a2 2 0 012.8 0l.6.6a2 2 0 010 2.8L8.6 18.8 4 20z"/>' +
+    '<path d="M14.8 5.8l3.4 3.4"/></svg>'
+}
+
+/* 预览用真实磁贴的骨架：图标板 + 两行名称。
+   以前是"首字 + 纯色块"，跟坞里长得不像，改了尺寸也看不出效果。 */
 function previewBlock() {
   const g = group('预览')
   const box = el('div', 'preview')
-  const demo = [['#4C7DF0', '浏览器'], ['#2E9E7E', '终端'], ['#8A5BD6', '设计']]
-  for (const [color, name] of demo) {
+  for (const [color, name, glyph] of [
+    ['#3B82F6', '浏览器', 'globe'],
+    ['#12A150', '终端', 'terminal'],
+    ['#8B5CF6', '设计工具', 'pen']
+  ]) {
     const t = el('div', 'pv-tile')
     const ico = el('div', 'pv-ico')
-    ico.style.background = color
-    ico.textContent = name[0]
+    ico.style.color = color
+    ico.innerHTML = PV_GLYPH[glyph]
     t.append(ico, el('div', 'pv-label', name))
     box.appendChild(t)
   }
   g.appendChild(box)
+  g.appendChild(el('div', 'preview-note', '改上面的尺寸，坞会立刻跟着变；把鼠标移到图标上能看到悬停态'))
   return g
 }
 
@@ -491,7 +508,7 @@ function buildActionTab(body) {
 
   const g3 = group('启动')
   const supported = !!(state.login && state.login.supported)
-  const loginRow = switchRow('开机自启', supported ? '登录 Windows 后自动在后台待命' : '打包安装后可用（开发模式下不可用）', s.launchAtLogin, async (v) => {
+  const loginRow = switchRow('开机自启', '登录 Windows 后自动在后台待命', s.launchAtLogin, async (v) => {
     const r = await api.setLogin(v)
     if (!r.ok) {
       loginRow._input.checked = !v
@@ -501,7 +518,8 @@ function buildActionTab(body) {
       toast(v ? '已开启开机自启' : '已关闭开机自启', 'ok')
     }
   }, 'launchAtLogin')
-  if (!supported) setRowDisabled(loginRow, true, '开发模式下不可用')
+  // 说明写"是什么"，禁用原因只写在 note 里 —— 两处都讲开发模式会重复
+  if (!supported) setRowDisabled(loginRow, true, '开发模式下不可用，安装版才生效')
   g3.appendChild(loginRow)
   body.appendChild(g3)
 }
@@ -584,13 +602,19 @@ function buildAboutTab(body) {
   body.appendChild(g)
 
   const g2 = group('操作提示')
+  const tips = el('div', 'tips')
   for (const [k, v] of [
     ['呼出', '鼠标滑到屏幕边缘停一下，坞会自动出现'],
     ['换边', '拖动坞顶部的标题栏到另一条边，松手即吸附'],
-    ['分类', '点标题折叠/展开；拖左边的握把可调整顺序'],
+    ['分类', '点标题折叠/展开；拖分类行右侧的握把（或右键 → 上移/下移）可调整顺序'],
     ['搜索', 'Ctrl+F 直接搜；Esc 逐层退出搜索、坞'],
     ['设置', '这个窗口开着时坞会保持展开，关掉后恢复自动隐藏']
-  ]) g2.appendChild(row(k, v))
+  ]) {
+    const tip = el('div', 'tip')
+    tip.append(el('span', 'tip-k', k), el('span', 'tip-v', v))
+    tips.appendChild(tip)
+  }
+  g2.appendChild(tips)
   body.appendChild(g2)
 
   const quit = el('button', 'btn sm mt-2', '退出桌面坞')

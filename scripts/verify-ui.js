@@ -391,6 +391,209 @@ app.whenReady().then(async () => {
     check('F3 恢复后磁贴数回到真实值', perf.tiles === 53 || perf.tiles > 0, perf.tiles + ' 个')
   }
 
+  /* ------------------------------------------------------------ G 分类头结构 */
+  console.log('\nG. 分类头：箭头在行首 / 整行可拖 / 手柄 hover 才露出')
+  const head = JSON.parse(await evalJs(dock, `(async () => {
+    const h = document.querySelector('.cat-head')
+    const cls = (n) => n.className
+    const left = (sel) => Math.round(h.querySelector(sel).getBoundingClientRect().left)
+    const caret = h.querySelector('.cat-caret')
+    const before = getComputedStyle(caret).transform
+    h.querySelector('.cat-toggle').click()          // 折叠一次，看箭头的旋转
+    await new Promise((r) => setTimeout(r, 320))    // 等 180ms 的过渡走完
+    const after = getComputedStyle(caret).transform
+    h.querySelector('.cat-toggle').click()          // 还原
+    await new Promise((r) => setTimeout(r, 320))
+    return JSON.stringify({
+      order: [...h.children].map(cls).join('|'),
+      toggleOrder: [...h.querySelector('.cat-toggle').children].map(cls).join('|'),
+      x: { caret: left('.cat-caret'), dot: left('.cat-dot'), name: left('.cat-name'), more: left('.cat-more') },
+      handleOpacity: getComputedStyle(h.querySelector('.handle')).opacity,
+      caretRotated: before !== after
+    })
+  })()`))
+  check('G1 箭头是分类头的第一个元素', head.order.startsWith('cat-toggle') && head.toggleOrder.startsWith('cat-caret'), head.toggleOrder)
+  check('G2 箭头在最左、在名称左侧', head.x.caret < head.x.dot && head.x.dot < head.x.name,
+    `caret=${head.x.caret} dot=${head.x.dot} name=${head.x.name}`)
+  check('G3 折叠时箭头旋转 90°', head.caretRotated === true)
+  check('G4 拖拽手柄默认不占视觉（opacity 0）', head.handleOpacity === '0', head.handleOpacity)
+
+  const idsBefore = await evalJs(dock, 'state.categories.map((c) => c.id).join(",")')
+  // 从分类名（不是手柄）按下并纵向拖 260px：验证整行都是拖拽热区
+  await evalJs(dock, `(() => {
+    const h = document.querySelector('.cat-head')
+    const r = h.getBoundingClientRect()
+    const base = { bubbles: true, cancelable: true, button: 0, pointerId: 1, pointerType: 'mouse', isPrimary: true }
+    const at = (y) => Object.assign({ clientX: Math.round(r.left + 30), clientY: Math.round(y) }, base)
+    h.dispatchEvent(new PointerEvent('pointerdown', at(r.top + 16)))
+    document.dispatchEvent(new PointerEvent('pointermove', at(r.top + 430)))
+    document.dispatchEvent(new PointerEvent('pointerup', at(r.top + 430)))
+    return true
+  })()`)
+  await sleep(600)
+  const idsAfter = await evalJs(dock, 'state.categories.map((c) => c.id).join(",")')
+  const sameSet = idsBefore.split(',').sort().join() === idsAfter.split(',').sort().join()
+  check('G5 从名称处按下也能拖拽排序', idsBefore !== idsAfter && sameSet,
+    `${idsBefore.slice(0, 30)} → ${idsAfter.slice(0, 30)}`)
+  await shot(dock, 'verify-cat-head.png')
+
+  /* -------------------------------------------------------- H 搜索结果视图 */
+  console.log('\nH. 搜索：结果列表 / 命中高亮 / 分类 chip / 无结果出口')
+  const s1 = JSON.parse(await evalJs(dock, `(() => {
+    document.querySelector('#btnSearch').click()
+    const i = document.querySelector('#searchInput')
+    i.value = 'e'
+    i.dispatchEvent(new Event('input', { bubbles: true }))
+    const rows = [...document.querySelectorAll('.res-row')]
+    const expected = state.items.filter((x) => x.name.toLowerCase().includes('e')).length
+    return JSON.stringify({
+      rows: rows.length,
+      expected,
+      sub: document.querySelector('#subCount').textContent,
+      chips: rows.filter((r) => r.querySelector('.res-cat')).length,
+      marks: rows.filter((r) => r.querySelector('.res-name mark')).length,
+      catHidden: getComputedStyle(document.querySelector('.cat')).display === 'none',
+      hint: document.querySelector('#hint').textContent
+    })
+  })()`))
+  check('H1 命中条数与数据一致', s1.rows === s1.expected && s1.expected > 0, `${s1.rows}/${s1.expected}`)
+  check('H2 标题显示结果数', s1.sub === `${s1.expected} 个结果`, s1.sub)
+  check('H3 每行都有分类 chip', s1.chips === s1.rows, `${s1.chips}/${s1.rows}`)
+  check('H4 命中片段高亮为 mark', s1.marks > 0, `${s1.marks} 行`)
+  check('H5 搜索时分类网格隐藏', s1.catHidden === true)
+  check('H6 底栏提示改成 Esc 退出搜索', s1.hint === 'Esc 退出搜索', s1.hint)
+
+  const s2 = JSON.parse(await evalJs(dock, `(() => {
+    const i = document.querySelector('#searchInput')
+    i.value = 'zzzz'
+    i.dispatchEvent(new Event('input', { bubbles: true }))
+    const box = document.querySelector('.results.is-empty')
+    return JSON.stringify({
+      empty: !!box,
+      centered: !!box && getComputedStyle(box).justifyContent === 'center',
+      btn: box ? box.querySelector('.btn')?.textContent : null,
+      sub: document.querySelector('#subCount').textContent
+    })
+  })()`))
+  check('H7 无结果时显示居中空态与清空按钮', s2.empty && s2.centered && s2.btn === '清空搜索', JSON.stringify(s2))
+  check('H8 无结果时标题写明没有匹配项', s2.sub === '没有匹配项', s2.sub)
+
+  const s3 = JSON.parse(await evalJs(dock, `(() => {
+    document.querySelector('.results .empty .btn').click()
+    const list = document.querySelector('#list')
+    return JSON.stringify({
+      results: !!document.querySelector('.results'),
+      searching: list.classList.contains('searching'),
+      catVisible: getComputedStyle(document.querySelector('.cat')).display !== 'none',
+      value: document.querySelector('#searchInput').value,
+      sub: document.querySelector('#subCount').textContent
+    })
+  })()`))
+  check('H9 清空搜索后回到分类网格', !s3.results && !s3.searching && s3.catVisible && s3.value === '', JSON.stringify(s3))
+  await shot(dock, 'verify-search-clear.png')
+  await evalJs(dock, "document.querySelector('#btnSearchClose').click(); true")
+
+  /* ------------------------------------------------------ I 文件拖入反馈 */
+  console.log('\nI. 从资源管理器拖文件：面板 / 目标分类 / 横幅 三重反馈')
+  const dragInfo = JSON.parse(await evalJs(dock, `(async () => {
+    const cats = [...document.querySelectorAll('.cat')]
+    const cat = cats[1] || cats[0]
+    const name = cat.querySelector('.cat-name').textContent
+    const dt = new DataTransfer()
+    dt.items.add(new File(['x'], '测试.lnk', { type: 'application/octet-stream' }))
+    const r = cat.getBoundingClientRect()
+    const at = { clientX: Math.round(r.left + 40), clientY: Math.round(r.top + 60) }
+    const fire = (t, el) => el.dispatchEvent(new DragEvent(t, { bubbles: true, cancelable: true, dataTransfer: dt, ...at }))
+    fire('dragenter', cat)
+    fire('dragover', cat)
+    const banner = document.querySelector('#dropBanner')
+    const on = {
+      dragClass: document.body.classList.contains('is-file-drag'),
+      target: document.querySelector('.cat.file-target .cat-name')?.textContent || null,
+      banner: banner.hidden ? null : banner.textContent,
+      hint: document.querySelector('#hint').textContent
+    }
+    fire('dragleave', document.querySelector('#panel'))
+    await new Promise((res) => setTimeout(res, 280))
+    const off = {
+      dragClass: document.body.classList.contains('is-file-drag'),
+      target: !!document.querySelector('.cat.file-target'),
+      bannerHidden: banner.hidden,
+      hint: document.querySelector('#hint').textContent
+    }
+    return JSON.stringify({ name, on, off })
+  })()`))
+  check('I1 拖入时面板进入文件拖拽态', dragInfo.on.dragClass === true)
+  check('I2 指针所在分类被高亮', dragInfo.on.target === dragInfo.name, `${dragInfo.on.target} / ${dragInfo.name}`)
+  check('I3 横幅写明松手会进哪个分类', (dragInfo.on.banner || '').includes(dragInfo.name), dragInfo.on.banner)
+  check('I4 拖入时底栏不重复同一句', dragInfo.on.hint === '', JSON.stringify(dragInfo.on.hint))
+  check('I5 离开后反馈全部撤销', !dragInfo.off.dragClass && !dragInfo.off.target && dragInfo.off.bannerHidden && dragInfo.off.hint === '拖图标可换分类',
+    JSON.stringify(dragInfo.off))
+
+  /* ------------------------------------------------------------- J 图钉 */
+  console.log('\nJ. 图钉：未固定描边 / 固定后填实')
+  const pin = JSON.parse(await evalJs(dock, `(() => {
+    // 真实配置可能本来就是固定的，先归零，从"未固定"这个已知状态开始
+    state.settings.pinned = false
+    applySettings()
+    const b = document.querySelector('#btnPin')
+    const p = b.querySelector('path')
+    const read = () => ({
+      pressed: b.getAttribute('aria-pressed'),
+      on: b.classList.contains('on'),
+      fill: getComputedStyle(p).fill
+    })
+    const before = read()
+    b.click()
+    const after = read()
+    b.click()
+    return JSON.stringify({ before, after })
+  })()`))
+  check('J1 未固定时是描边（fill none）', pin.before.pressed === 'false' && pin.before.fill === 'none', JSON.stringify(pin.before))
+  check('J2 固定后 aria-pressed 与填实同时生效', pin.after.pressed === 'true' && pin.after.on && pin.after.fill !== 'none',
+    JSON.stringify(pin.after))
+
+  /* --------------------------------------------------------- K 分类头吸顶 */
+  console.log('\nK. 分类头吸顶')
+  const sticky = JSON.parse(await evalJs(dock, `(() => {
+    const list = document.querySelector('#list')
+    const prev = list.style.cssText
+    // 先把列表压矮，保证一定滚得动，结论与窗口高度无关
+    list.style.flex = '0 0 auto'
+    // 视口压到比任何一组都矮，滚动才真正跨进分组内部
+    list.style.height = '160px'
+    const cats = [...document.querySelectorAll('.cat')]
+    const tallest = cats.reduce((a, b) => b.getBoundingClientRect().height > a.getBoundingClientRect().height ? b : a)
+    const lr0 = list.getBoundingClientRect()
+    const cr0 = tallest.getBoundingClientRect()
+    // 停在"最高那一组"内部 60px 处：标题该吸住，磁贴从它下面穿过去
+    list.scrollTop = Math.round(list.scrollTop + (cr0.top - lr0.top) + 60)
+    const lr = list.getBoundingClientRect()
+    const head = tallest.querySelector('.cat-head')
+    const hr = head.getBoundingClientRect()
+    const heads = [...document.querySelectorAll('.cat-head')]
+    const stuck = heads.filter((h) => Math.abs(h.getBoundingClientRect().top - lr.top - 8) <= 2)
+      .map((h) => h.querySelector('.cat-name').textContent)
+    const out = {
+      scrolled: Math.round(list.scrollTop),
+      sh: list.scrollHeight, ch: list.clientHeight,
+      tallestName: head.querySelector('.cat-name').textContent,
+      headTop: Math.round(hr.top - lr.top),
+      stuck,
+      insideSection: hr.bottom <= tallest.getBoundingClientRect().bottom + 1,
+      // 吸住的标题必须盖住磁贴：取它下沿往上 2px 的像素，不应还看到磁贴
+      opaque: getComputedStyle(head).backgroundColor !== 'rgba(0, 0, 0, 0)'
+    }
+    list.style.cssText = prev
+    list.scrollTop = 0
+    return JSON.stringify(out)
+  })()`))
+  check('K1 列表可滚动（测试前提）', sticky.scrolled > 0, JSON.stringify(sticky))
+  check('K2 当前分组标题吸在列表顶部', sticky.headTop === 8, `${sticky.tallestName} top=${sticky.headTop}`)
+  check('K3 同时只有一个标题吸顶', sticky.stuck.length === 1 && sticky.stuck[0] === sticky.tallestName, JSON.stringify(sticky.stuck))
+  check('K4 吸顶没有越过所属分组', sticky.insideSection === true)
+  check('K5 吸顶标题是不透明底', sticky.opaque === true)
+
   console.log(`\n${fails === 0 ? '全部通过' : fails + ' 项失败'}`)
   await sleep(300)
   app.exit(fails === 0 ? 0 : 1)

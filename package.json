@@ -1,7 +1,7 @@
 {
   "name": "desk-dock",
   "productName": "DeskDock",
-  "version": "1.4.1",
+  "version": "1.4.3",
   "description": "桌面坞 - 把桌面快捷方式收纳进贴边隐藏的小坞，还你一个干净的桌面",
   "main": "src/main/main.js",
   "author": "PZB",

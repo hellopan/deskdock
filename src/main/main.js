@@ -927,10 +927,24 @@ function fixIpc() {
     const st = store.publicState()
     const cat = st.categories.find((c) => c.id === id)
     if (!cat) return
+    const cats = st.categories
+    const idx = cats.findIndex((c) => c.id === id)
+    // 键盘 / 触屏的排序等价路径：拖拽手柄只在 hover 时露出，不能是唯一手段
+    const move = (delta) => {
+      const ids = cats.map((c) => c.id)
+      const j = idx + delta
+      if (j < 0 || j >= ids.length) return
+      ids.splice(j, 0, ids.splice(idx, 1)[0])
+      store.reorderCategories(ids)
+      broadcast()
+    }
     menuOpen = true
     const menu = Menu.buildFromTemplate([
       { label: '重命名分类…', click: () => sendToRenderer('ui:rename-cat', id) },
       { label: '修改颜色…', click: () => sendToRenderer('ui:color-cat', id) },
+      { type: 'separator' },
+      { label: '上移', enabled: idx > 0, click: () => move(-1) },
+      { label: '下移', enabled: idx >= 0 && idx < cats.length - 1, click: () => move(1) },
       { type: 'separator' },
       { label: '删除分类', click: async () => {
         const r = store.deleteCategory(id)

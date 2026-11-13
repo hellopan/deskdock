@@ -210,6 +210,8 @@ function createCat(cat) {
   more.type = 'button'
   more.innerHTML = ICON.more
   more.title = '分类操作'
+  /* 箭头放最左：展开状态与名称相邻，扫读一次完成。
+     以前贴在最右，和名称隔着一整行，要先找到行尾才知道这组是开是合。 */
   const caret = el('span', 'cat-caret')
   caret.setAttribute('aria-hidden', 'true')
   caret.innerHTML = ICON.chevron
@@ -220,8 +222,8 @@ function createCat(cat) {
   const toggle = el('button', 'cat-toggle')
   toggle.type = 'button'
   toggle.setAttribute('aria-expanded', 'true')
-  toggle.append(dot, name, count, spacer, caret)
-  head.append(handle, toggle, more)
+  toggle.append(caret, dot, name, count, spacer)
+  head.append(toggle, handle, more)
 
   head.addEventListener('click', (e) => {
     if (e.target.closest('.cat-more') || handle.contains(e.target)) return
@@ -232,7 +234,18 @@ function createCat(cat) {
     e.stopPropagation()
     api.categoryMenu(sec.dataset.id)
   })
-  handle.addEventListener('pointerdown', (e) => startCatDrag(e, sec))
+  /* 整行都能拖（5px 阈值区分点击折叠），⠿ 只是"这里能拖"的提示，不是唯一热区。
+     触摸仍只从手柄拖：pointerdown 上的 preventDefault 会吞掉 tap 的 click，
+     挂在整行上会让"点一下折叠"在触屏失效。 */
+  head.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('.cat-more')) return
+    if (e.pointerType === 'touch' && !e.target.closest('.handle')) return
+    // 下面 startCatDrag 会 preventDefault，默认的"按下即聚焦"就没了；
+    // 手动补上，鼠标点完再按空格仍能折叠
+    const t = e.target.closest('.cat-toggle')
+    if (t && document.activeElement !== t) t.focus({ preventScroll: true })
+    startCatDrag(e, sec)
+  })
 
   const grid = el('div', 'grid')
   grid.dataset.cat = cat.id
@@ -388,7 +401,8 @@ function dropIndex(grid, x, y) {
 const view = {
   cats: new Map(),    // 分类 id -> createCat 返回的记录
   tiles: new Map(),   // 条目 id -> 磁贴节点
-  msg: null           // 空态 / 搜索无结果，独立挂在列表里
+  msg: null,          // 空态提示，独立挂在列表里
+  results: null       // 搜索结果容器
 }
 
 function resetList() {
@@ -396,6 +410,7 @@ function resetList() {
   view.cats.clear()
   view.tiles.clear()
   view.msg = null
+  view.results = null
 }
 
 function setListMessage(node) {
@@ -423,35 +438,38 @@ function render() {
 
 function paintList() {
   const list = $('#list')
-  const q = query.trim().toLowerCase()
-  const searching = !!q
+  const q = query.trim()
+  const ql = q.toLowerCase()
   const total = state.items.length
-
-  $('#subCount').textContent = searching
-    ? `搜索 "${query.trim()}"`
-    : `${total} 个快捷方式 · ${state.categories.length} 个分类`
 
   // 能重新渲染说明这一轮数据已经落定，拖拽插入线不该留着
   clearDropLine()
 
   if (!total) {
+    clearResults()
     resetList()
+    $('#subCount').textContent = '0 个快捷方式'
     const box = el('div', 'empty full')
     box.innerHTML = '<b>坞里还是空的</b><br>点下面的按钮，把桌面上的快捷方式一次收进来<br>也可以直接把 .lnk 文件拖到窗口里'
     const btn = el('button', 'btn primary sm', '从桌面导入快捷方式')
     btn.addEventListener('click', importFlow)
     box.appendChild(btn)
     setListMessage(box)
+    paintHint()
     return
   }
 
-  const visible = []
-  for (const cat of state.categories) {
-    let items = itemsOf(cat.id)
-    if (searching) items = items.filter((i) => i.name.toLowerCase().includes(q))
-    if (searching && !items.length) continue
-    visible.push({ cat, items })
+  // 搜索走独立的结果列表：分类网格帮不上"命中在哪、还有几条"
+  if (ql) {
+    paintResults(q, ql)
+    paintHint()
+    return
   }
+
+  clearResults()
+  $('#subCount').textContent = `${total} 个快捷方式 · ${state.categories.length} 个分类`
+
+  const visible = state.categories.map((cat) => ({ cat, items: itemsOf(cat.id) }))
 
   // 倒序摆放分类：每个都插到"下一个"之前，最终就是正序
   let next = null
@@ -462,7 +480,7 @@ function paintList() {
       rec = createCat(cat)
       view.cats.set(cat.id, rec)
     }
-    updateCat(rec, cat, items, searching)
+    updateCat(rec, cat, items, false)
     if (next) {
       if (rec.sec.parentElement !== list || rec.sec.nextElementSibling !== next) list.insertBefore(rec.sec, next)
     } else if (rec.sec.parentElement !== list || rec.sec.nextElementSibling) {
@@ -471,7 +489,7 @@ function paintList() {
     next = rec.sec
   }
 
-  // 分类被删或搜索过滤掉了，节点和缓存一起清
+  // 分类被删掉了，节点和缓存一起清
   const shown = new Set(visible.map((v) => v.cat.id))
   for (const [id, rec] of view.cats) {
     if (shown.has(id)) continue
@@ -479,14 +497,185 @@ function paintList() {
     view.cats.delete(id)
   }
 
-  setListMessage(searching && !visible.length
-    ? el('div', 'empty', `没有找到包含 “${query.trim()}” 的快捷方式`)
-    : null)
+  setListMessage(null)
 
   // 已经不在坞里、也没被别的分类接手的磁贴
   for (const [id, t] of view.tiles) if (!t.isConnected) view.tiles.delete(id)
   // 键盘焦点环跟着节点走，节点没了就一起清掉
   if (kbTile && !kbTile.isConnected) kbTile = null
+  paintHint()
+}
+
+/* ------------------------------------------------ 搜索结果 */
+
+function clearResults() {
+  $('#list').classList.remove('searching')
+  if (view.results) {
+    view.results.remove()
+    view.results = null
+  }
+}
+
+function paintResults(q, ql) {
+  const list = $('#list')
+  list.classList.add('searching')
+  // 分类网格整体藏起来但节点保留：退出搜索时不用重建 12 个分类，
+  // 折叠状态也原样留在节点上，回来时 updateCat 会照旧还原
+
+  const hits = []
+  for (const cat of state.categories) {
+    for (const item of itemsOf(cat.id)) {
+      if (item.name.toLowerCase().includes(ql)) hits.push({ item, cat })
+    }
+  }
+  $('#subCount').textContent = hits.length ? `${hits.length} 个结果` : '没有匹配项'
+
+  let box = view.results
+  if (!box) {
+    box = el('div', 'results')
+    view.results = box
+  }
+  if (box.parentElement !== list) list.appendChild(box)
+  box.textContent = ''
+  box.classList.toggle('is-empty', !hits.length)
+
+  if (!hits.length) {
+    const empty = el('div', 'empty full', `没有找到包含 “${q}” 的快捷方式`)
+    const btn = el('button', 'btn sm', '清空搜索')
+    btn.type = 'button'
+    btn.addEventListener('click', resetSearch)
+    empty.appendChild(btn)
+    box.appendChild(empty)
+    return
+  }
+
+  for (const { item, cat } of hits) box.appendChild(resultRow(item, cat, ql))
+}
+
+/* 结果行：24px 图标 + 名称（命中片段高亮）+ 分类 chip。
+   高度 40px，53 条命中时一屏能扫完十几条，比 68px 磁贴密得多。 */
+function resultRow(item, cat, ql) {
+  const row = el('button', 'res-row')
+  row.type = 'button'
+  row.dataset.id = item.id
+  if (item.missing) row.classList.add('missing')
+  row.title = item.missing ? `${item.name}\n⚠️ 快捷方式文件已丢失` : item.name
+
+  const ico = el('span', 'res-ico')
+  const name = el('span', 'res-name')
+  const chip = el('span', 'res-cat')
+  const dot = el('span', 'res-dot')
+  dot.style.background = cat.color
+  chip.append(dot, document.createTextNode(cat.name))
+  row.append(ico, name, chip)
+
+  fillMark(name, item.name, ql)
+  paintSmallIcon(ico, item)
+
+  row.addEventListener('click', async () => {
+    const r = await api.openItem(item.id)
+    if (r && r.ok === false && r.message) toast('打开失败：' + r.message, 'err')
+  })
+  row.addEventListener('contextmenu', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    api.itemMenu(item.id)
+  })
+  return row
+}
+
+/* 命中片段 <mark>：用节点拼，名称来自文件名，不能当 HTML 解析 */
+function fillMark(node, name, ql) {
+  node.textContent = ''
+  const lower = name.toLowerCase()
+  let i = 0
+  while (i < name.length) {
+    const at = lower.indexOf(ql, i)
+    if (at < 0) {
+      node.appendChild(document.createTextNode(name.slice(i)))
+      break
+    }
+    if (at > i) node.appendChild(document.createTextNode(name.slice(i, at)))
+    const m = document.createElement('mark')
+    m.textContent = name.slice(at, at + ql.length)
+    node.appendChild(m)
+    i = at + ql.length
+  }
+}
+
+function paintSmallIcon(holder, item) {
+  holder.textContent = ''
+  const sig = iconSig(item)
+  const cached = iconCache.get(item.id)
+  if (cached && iconKey.get(item.id) === sig) {
+    const img = el('img')
+    img.src = cached
+    img.alt = ''
+    holder.appendChild(img)
+  } else {
+    holder.appendChild(el('span', 'fallback', (item.name[0] || '?').toUpperCase()))
+    requestIcon(item, holder)
+  }
+}
+
+function resetSearch() {
+  query = ''
+  const input = $('#searchInput')
+  if (input) input.value = ''
+  render()
+  if (input) input.focus()
+}
+
+/* 底栏提示跟着当前处境走：空坞里没有图标可拖，搜索里该讲怎么退出。
+   文件拖入时不在这里重复 —— 底部横幅已经写明去向，两处同文只是噪声。 */
+function paintHint() {
+  const hint = $('#hint')
+  if (!hint) return
+  let text = '拖图标可换分类'
+  if (document.body.classList.contains('is-file-drag')) text = ''
+  else if (query.trim()) text = 'Esc 退出搜索'
+  else if (!state.items.length) text = '把 .lnk 文件拖进来即可添加'
+  if (hint.textContent !== text) hint.textContent = text
+}
+
+/* ------------------------------------------------ 从资源管理器拖文件 */
+let fileDragCat = null
+let fileDragTimer = 0
+
+function catNode(id) {
+  if (!id) return null
+  return [...document.querySelectorAll('#list .cat')].find((s) => s.dataset.id === id) || null
+}
+
+/* 文件拖拽三件事同时给到：面板描边、目标分类高亮、底部横幅写明去向。
+   以前只有 preventDefault，拖过去不知道能不能松手、松手会进哪一组。 */
+function setFileDrag(on, catId) {
+  const banner = $('#dropBanner')
+  if (!on) {
+    clearTimeout(fileDragTimer)
+    if (!document.body.classList.contains('is-file-drag')) return
+    document.body.classList.remove('is-file-drag')
+    document.querySelectorAll('#list .cat.file-target').forEach((s) => s.classList.remove('file-target'))
+    fileDragCat = null
+    if (banner) banner.hidden = true
+    paintHint()
+    return
+  }
+  document.body.classList.add('is-file-drag')
+  if (fileDragCat !== catId) {
+    const prev = catNode(fileDragCat)
+    if (prev) prev.classList.remove('file-target')
+    fileDragCat = catId
+    const next = catNode(catId)
+    if (next) next.classList.add('file-target')
+  }
+  if (banner) {
+    const cat = catId && state.categories.find((c) => c.id === catId)
+    const text = cat ? `松开添加到「${cat.name}」` : '松开即可添加'
+    if (banner.textContent !== text) banner.textContent = text
+    banner.hidden = false
+  }
+  paintHint()
 }
 
 /* --------------------------------------------------- 分类拖动排序 */
@@ -1023,27 +1212,43 @@ function bind() {
   window.addEventListener('pointerup', () => endDrag())
   window.addEventListener('blur', () => endDrag())
 
-  /* 从资源管理器拖文件进来 */
+  /* 从资源管理器拖文件进来：拖到哪、会进哪个分类，全程都要看得见 */
   const panel = $('#panel')
+  const dropCat = (e) => {
+    const sec = e.target && e.target.closest ? e.target.closest('.cat') : null
+    if (sec && state.categories.some((c) => c.id === sec.dataset.id)) return sec.dataset.id
+    // 松手位置不在任何分类上时落到第一个分类 —— 那也得先把它标出来
+    return state.categories[0] ? state.categories[0].id : null
+  }
+  panel.addEventListener('dragenter', (e) => {
+    if (e.dataTransfer.types.includes('Files')) e.preventDefault()
+  })
   panel.addEventListener('dragover', (e) => {
-    if (e.dataTransfer.types.includes('Files')) {
-      e.preventDefault()
-      e.dataTransfer.dropEffect = 'copy'
-    }
+    if (!e.dataTransfer.types.includes('Files')) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+    clearTimeout(fileDragTimer)
+    setFileDrag(true, dropCat(e))
+  })
+  panel.addEventListener('dragleave', () => {
+    // 在子元素之间移动也会触发 dragleave，靠下一次 dragover 续命
+    clearTimeout(fileDragTimer)
+    fileDragTimer = setTimeout(() => setFileDrag(false), 140)
   })
   panel.addEventListener('drop', async (e) => {
     if (!e.dataTransfer.files || !e.dataTransfer.files.length) return
     e.preventDefault()
     e.stopPropagation()
+    const catId = dropCat(e)
+    setFileDrag(false)
     const paths = [...e.dataTransfer.files].map((f) => api.pathForFile(f)).filter(Boolean)
     if (!paths.length) return
-    // 落到指针所在的分类，找不到就放第一个
-    let catId = state.categories[0].id
-    const sec = e.target.closest ? e.target.closest('.cat') : null
-    if (sec) catId = sec.dataset.id
+    if (!catId) return toast('先建一个分类再往里放', 'err')
     const r = await api.addFiles(paths, catId)
     toast(`已添加 ${r.imported} 个快捷方式`, 'ok')
   })
+  window.addEventListener('dragend', () => setFileDrag(false))
+  window.addEventListener('drop', () => setFileDrag(false))
 
   /* 传送带事件 */
   api.on('settings:changed', ({ settings }) => {

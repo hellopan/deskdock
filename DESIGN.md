@@ -212,9 +212,21 @@ font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI",
 
 ### 6.2 分类头 `.cat-head`
 
-高 32px，由三部分组成：`⠿` 手柄（拖动排序）、折叠按钮、`⋯`（分类菜单）。
+高 32px，从左到右：`▾` 折叠箭头、色点、名称、数量、`⠿` 手柄、`⋯`（分类菜单）。
+
+**吸顶**：`position: sticky; top: 0; z-index: 2`，底色 `--surface-1`（必须不透明，否则磁贴从标题下穿过），
+再用 `box-shadow: 0 -8px 0 var(--surface-1)` 铺满 `.list` 的上内边距——否则滚动时标题上方会漏出一条内容。
+hover 底色是半透明的，需垫在不透明底上（`background-image: linear-gradient(var(--hover), var(--hover))`）。
+吸顶范围受所属 `.cat` 限制，滚动到下一组时上一组标题自然被顶走，任何时刻只吸住一个。
+
+箭头在最左——展开状态与名称相邻，扫读一次完成；贴在最右时和名称隔着一整行，要先找到行尾才知道这组是开是合。
 折叠按钮是**真 button**：`aria-expanded` + `aria-controls` 指向 `#grid-<id>`，Enter/Space 原生激活；
-`head` 上的 click 让整行空白处也能折叠。箭头在 `⋯` 左侧，随 `aria-expanded` 旋转 180°。
+`head` 上的 click 让整行空白处也能折叠；箭头随 `aria-expanded` 旋转 −90°。
+
+整行都是拖拽热区（5px 阈值区分点击折叠），`⠿` 只在 hover / `:focus-within` 时以 50% 不透明度露出，不是唯一入口：
+`⋯` 菜单提供「上移 / 下移」作为键盘与触屏的排序路径。触摸仍只从手柄拖——
+`pointerdown` 上的 `preventDefault` 会吞掉 tap 的 click，挂在整行上会让触屏"点一下折叠"失效。
+点击时手动 `focus()` 折叠按钮，补上 `preventDefault` 吃掉的默认聚焦。
 
 ### 6.3 按钮
 
@@ -227,6 +239,8 @@ font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI",
 | `.btn.sm` | 28 | 11 | 用于设置页整宽动作 |
 | `.ghost-btn`（底栏） | 28 | 11 | 透明，hover `--surface-2` |
 | `.mini-btn`（搜索栏） | 32 | 12 | 透明 + 边线 |
+
+**顶栏状态**：图钉未固定时是 1.5px 描边（与搜索/导入/设置同重量），`aria-pressed="true"` 才 `fill: currentColor` 并加 `.on`（`--accent-soft` 底 + `--accent` 字）。默认就实心会让"没固定"看起来像"已选中"。
 
 `.btn.block` 撑满一行；设置页的"放回桌面"、"退出"必须 `block`。
 
@@ -251,6 +265,30 @@ font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI",
 | 分类为空 | 56px 虚线投放区，文案"把图标拖到这里" |
 | 搜索无结果 | 一句"没有匹配的快捷方式" + 清除搜索的按钮 |
 | 导入全不选 | "继续"按钮禁用，并说明"至少选择一项" |
+
+### 6.7 搜索结果 `.res-row`
+
+搜索命中时不再过滤分类网格，而是整块换成结果列表——分类网格回答不了"命中在哪、一共几条"。
+
+- 行高 40px，`--r-sm` 圆角，hover `--hover`；整行是 `<button>`（Enter 打开，右键菜单与磁贴同源）。
+- 结构：24px 图标（`--icon-plate` 底，与磁贴同一套取图链路）+ 名称 + 分类 chip。
+- 命中片段用 `<mark>`：`--accent-soft` 底 + `--accent` 字；名称由节点拼成，不解析 HTML。
+- 分类 chip：`--surface-2` 底、`--r-pill`、5px 分类色点、`--muted` 字，右对齐，最宽 44%。
+- 标题区显示 `N 个结果`；0 条时显示 `没有匹配项`，列表居中给空态 + 「清空搜索」。
+- 搜索期间分类节点只隐藏不销毁（`.list.searching .cat`），退出后折叠状态原样保留。
+
+### 6.8 文件拖入反馈
+
+从资源管理器拖文件进来时，三处同时给反馈，缺一不可：
+
+| 位置 | 表现 |
+| --- | --- |
+| 面板 | 边框转 `--accent`，并加 1px 内描边 |
+| 目标分类 | 分类头 `--accent-soft` 底，名称与计数转 `--accent` |
+| 底部 | 横幅「松开添加到「分类名」」：`--accent-fill` 底 + 白字 + `--r-pill`，`pointer-events: none` 不挡拖拽 |
+
+指针不在任何分类上时落到第一个分类，横幅同样写明去向。离开面板 140ms 后撤销
+（`dragleave` 在子元素之间移动也会触发，靠持续 `dragover` 续命）。底栏此时留空，不重复同一句。
 
 ---
 

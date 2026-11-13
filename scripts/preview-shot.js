@@ -200,6 +200,62 @@ app.whenReady().then(async () => {
   await win.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'))
   await new Promise((r) => setTimeout(r, 1400))
 
+  // SHOT_SEARCH=<词> → 打开搜索并输入，看结果视图（含无结果态）
+  if (process.env.SHOT_SEARCH) {
+    await win.webContents.executeJavaScript(`(() => {
+      document.querySelector('#btnSearch').click()
+      const i = document.querySelector('#searchInput')
+      i.value = ${JSON.stringify(process.env.SHOT_SEARCH)}
+      i.dispatchEvent(new Event('input', { bubbles: true }))
+      return true
+    })()`)
+    await new Promise((r) => setTimeout(r, 500))
+  }
+
+  // SHOT_SCROLL=<px> → 滚到指定位置，验证分类头吸顶
+  if (process.env.SHOT_SCROLL) {
+    const info = await win.webContents.executeJavaScript(`(() => {
+      const list = document.querySelector('#list')
+      list.scrollTop = ${Number(process.env.SHOT_SCROLL) || 300}
+      const lr = list.getBoundingClientRect()
+      const heads = [...document.querySelectorAll('.cat-head')]
+      const stuck = heads.filter((h) => Math.abs(h.getBoundingClientRect().top - lr.top) < 2)
+      return {
+        scrollTop: Math.round(list.scrollTop),
+        listTop: Math.round(lr.top),
+        stuckHeads: stuck.map((h) => h.querySelector('.cat-name').textContent),
+        headTops: heads.slice(0, 4).map((h) => Math.round(h.getBoundingClientRect().top))
+      }
+    })()`)
+    console.log('scroll', JSON.stringify(info))
+    await new Promise((r) => setTimeout(r, 300))
+  }
+
+  // SHOT_DRAG=<分类序号> → 模拟"从资源管理器拖文件进来"，验证落点反馈
+  if (process.env.SHOT_DRAG) {
+    const info = await win.webContents.executeJavaScript(`(() => {
+      const cats = [...document.querySelectorAll('.cat')]
+      const cat = cats[${Number(process.env.SHOT_DRAG) || 1}] || cats[0]
+      const dt = new DataTransfer()
+      dt.items.add(new File(['x'], '测试.lnk', { type: 'application/octet-stream' }))
+      const r = cat.getBoundingClientRect()
+      const at = { clientX: Math.round(r.left + 40), clientY: Math.round(r.top + 60) }
+      const fire = (type) => cat.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt, ...at }))
+      fire('dragenter')
+      fire('dragover')
+      const banner = document.querySelector('#dropBanner')
+      const target = document.querySelector('.cat.file-target')
+      return {
+        body: document.body.className,
+        target: target ? target.querySelector('.cat-name').textContent : null,
+        banner: banner.hidden ? null : banner.textContent,
+        hint: document.querySelector('#hint').textContent
+      }
+    })()`)
+    console.log('drag', JSON.stringify(info))
+    await new Promise((r) => setTimeout(r, 300))
+  }
+
   // SHOT_METRICS=1 → 输出布局度量，用来比对不同 DPI 缩放下是否发生回流/裁切
   if (process.env.SHOT_METRICS === '1') {
     const m = await win.webContents.executeJavaScript(`(() => {
@@ -242,6 +298,44 @@ app.whenReady().then(async () => {
   console.log('saved', outFile)
 
   // 设置已搬到独立窗口：截图与断言见 scripts/settings-shot.js
+
+  // SHOT_HEAD=1 → 分类头结构探针：箭头是否在行首、拖拽手柄是否只在 hover 时露出
+  if (process.env.SHOT_HEAD === '1') {
+    const head = await win.webContents.executeJavaScript(`(() => {
+      const h = document.querySelector('.cat-head')
+      const x = (sel) => Math.round(h.querySelector(sel).getBoundingClientRect().left * 10) / 10
+      return {
+        order: [...h.children].map((n) => n.className).join(' | '),
+        toggleOrder: [...h.querySelector('.cat-toggle').children].map((n) => n.className).join(' | '),
+        left: { caret: x('.cat-caret'), dot: x('.cat-dot'), name: x('.cat-name'),
+                count: x('.cat-count'), handle: x('.handle'), more: x('.cat-more') },
+        handleOpacity: getComputedStyle(h.querySelector('.handle')).opacity
+      }
+    })()`)
+    console.log('head', JSON.stringify(head))
+
+    const pt = await win.webContents.executeJavaScript(
+      `(() => { const b = document.querySelector('.cat-head').getBoundingClientRect(); return { x: Math.round(b.left + 24), y: Math.round(b.top + b.height / 2) } })()`)
+    win.webContents.sendInputEvent({ type: 'mouseMove', x: pt.x, y: pt.y })
+    await new Promise((r) => setTimeout(r, 400))
+    const hover = await win.webContents.executeJavaScript(`(() => {
+      const h = document.querySelector('.cat-head')
+      return { isHover: h.matches(':hover'), handleOpacity: getComputedStyle(h.querySelector('.handle')).opacity }
+    })()`)
+    console.log('head-hover', JSON.stringify(hover))
+    fs.writeFileSync(outFile.replace(/\.png$/, '-hover.png'), (await win.webContents.capturePage()).toPNG())
+
+    // 整行拖拽在 pointerdown 上 preventDefault：确认真实鼠标点击仍能折叠（没被吞掉）
+    win.webContents.sendInputEvent({ type: 'mouseDown', x: pt.x, y: pt.y, button: 'left', clickCount: 1 })
+    win.webContents.sendInputEvent({ type: 'mouseUp', x: pt.x, y: pt.y, button: 'left', clickCount: 1 })
+    await new Promise((r) => setTimeout(r, 350))
+    const click = await win.webContents.executeJavaScript(`(() => {
+      const c = document.querySelector('.cat')
+      return { collapsed: c.classList.contains('collapsed'), aria: c.querySelector('.cat-toggle').getAttribute('aria-expanded'),
+               focused: document.activeElement.className }
+    })()`)
+    console.log('head-click', JSON.stringify(click))
+  }
 
   // SHOT_PROBE=1 → 验证增量渲染：节点是否复用、滚动与焦点是否保留、改名/失效/换分类能否原地更新
   if (process.env.SHOT_PROBE === '1') {

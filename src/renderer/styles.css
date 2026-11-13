@@ -98,6 +98,9 @@ body[data-edge="top"] .header, body[data-edge="bottom"] .header { border-bottom:
 .icon-btn:hover { background: var(--hover); color: var(--text); }
 .icon-btn:active { transform: scale(.94); }
 .icon-btn.on { background: var(--accent-soft); color: var(--accent); }
+/* 图钉：未固定时 1.5 描边，和另外三个顶栏图标同重量；固定后填实成强调色。
+   以前默认就是实心，没固定也像"已选中"。 */
+#btnPin[aria-pressed="true"] svg path { fill: currentColor; }
 
 /* ---------------- 搜索 ---------------- */
 .searchbar {
@@ -122,6 +125,54 @@ body[data-edge="top"] .header, body[data-edge="bottom"] .header { border-bottom:
 }
 .mini-btn:hover { background: var(--hover); color: var(--text); }
 
+/* 搜索结果：40px 行，比 68px 磁贴密，一屏能扫十几条 */
+.list.searching .cat { display: none; }
+.results { display: flex; flex-direction: column; gap: 2px; padding-top: var(--s1); }
+/* 没有命中时把空态立起来居中：百分比高度在 auto 高度的容器里不生效 */
+.results.is-empty { min-height: 100%; justify-content: center; padding-bottom: 12%; }
+.results.is-empty .empty.full { min-height: 0; padding-bottom: 0; }
+.res-row {
+  display: flex; align-items: center; gap: var(--s2);
+  width: 100%; height: 40px; padding: 0 var(--s2);
+  border: 0; border-radius: var(--r-sm);
+  background: transparent; color: var(--text);
+  font: inherit; text-align: left; cursor: pointer;
+}
+.res-row:hover { background: var(--hover); }
+.res-row:active { background: var(--active); }
+.res-row.missing .res-name { color: var(--muted); }
+.res-ico {
+  width: 24px; height: 24px; flex: none;
+  border-radius: var(--r-xs);
+  display: grid; place-items: center;
+  background: var(--icon-plate);
+  overflow: hidden;
+}
+.res-ico img { width: 100%; height: 100%; object-fit: contain; }
+.res-ico .fallback {
+  width: 100%; height: 100%; display: grid; place-items: center;
+  font-size: var(--fs-11); font-weight: 600; color: var(--text-dim);
+  background: var(--surface-2);
+}
+.res-name {
+  flex: 1; min-width: 0;
+  font-size: var(--fs-12); color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.res-name mark {
+  background: var(--accent-soft); color: var(--accent);
+  border-radius: 3px; padding: 0 1px;
+}
+.res-cat {
+  flex: none; max-width: 44%;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px; border-radius: var(--r-pill);
+  background: var(--surface-2);
+  font-size: var(--fs-11); color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.res-dot { width: 5px; height: 5px; border-radius: var(--r-pill); flex: none; }
+
 /* ---------------- 列表 ---------------- */
 .list {
   flex: 1; min-height: 0;
@@ -137,17 +188,35 @@ body[data-edge="top"] .header, body[data-edge="bottom"] .header { border-bottom:
 .cat.drag-over { background: var(--accent-soft); }
 
 .cat-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex; align-items: center; gap: 6px;
   min-height: 32px;
-  padding: 4px 6px 4px 4px;
+  padding: 4px 6px 4px 2px;
   border-radius: var(--r-sm);
   cursor: pointer;
+  /* 吸顶必须有不透明底，否则磁贴会从标题下面穿过去；
+     向上的负阴影正好铺满 .list 的 8px 上内边距，滚动时不会漏出一条 */
+  background: var(--surface-1);
+  box-shadow: 0 calc(-1 * var(--s2)) 0 0 var(--surface-1);
 }
-.cat-head:hover { background: var(--hover); }
+/* hover 色是半透明的，垫在不透明底上才不会透出滚动内容 */
+.cat-head:hover {
+  background: var(--surface-1);
+  background-image: linear-gradient(var(--hover), var(--hover));
+}
+/* 拖拽手柄移到行尾：箭头占了行首，手柄退成 hover 才露出的提示
+   （整行都能拖，它不是唯一热区）。常驻会跟 ⋯ 抢同一块视觉空间。 */
 .cat-head .handle {
-  width: 14px; flex: none; color: var(--muted); opacity: .55;
+  width: 16px; flex: none; color: var(--muted);
+  opacity: 0;
   cursor: grab; display: grid; place-items: center;
+  transition: opacity var(--t-fast) ease;
 }
+.cat-head:hover .handle,
+.cat-head:focus-within .handle { opacity: .5; }
+.cat-head .handle:hover { opacity: 1; }
 .cat-head .handle:active { cursor: grabbing; }
 /* 折叠开关：视觉上仍是"整行"，但语义是一个按钮 */
 .cat-toggle {
@@ -180,7 +249,8 @@ body[data-edge="top"] .header, body[data-edge="bottom"] .header { border-bottom:
 .cat-more:focus-visible { opacity: 1; }
 .cat-more:hover { background: var(--active); color: var(--text); }
 .cat-caret {
-  width: 16px; flex: none; color: var(--muted); display: grid; place-items: center;
+  width: 16px; flex: none; margin-right: -2px; color: var(--muted);
+  display: grid; place-items: center;
   transition: transform 180ms ease;
 }
 .cat.collapsed .cat-caret { transform: rotate(-90deg); }
@@ -329,6 +399,34 @@ body.no-label .tile { padding-bottom: var(--s2); }
 }
 .ghost-btn:hover { color: var(--text); background: var(--surface-2); }
 .hint { font-size: var(--fs-11); color: var(--muted); }
+
+/* ---------------- 文件拖入 ---------------- */
+/* 三重反馈：面板描边、目标分类高亮、底部横幅写明"松手会进哪一组" */
+body.is-file-drag .panel {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-panel), inset 0 0 0 1px var(--accent);
+}
+.cat.file-target > .cat-head {
+  background: var(--accent-soft);
+  background-image: none;
+}
+.cat.file-target > .cat-head .cat-name,
+.cat.file-target > .cat-head .cat-count { color: var(--accent); }
+.drop-banner {
+  position: absolute;
+  left: 50%; bottom: 54px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 24px);
+  padding: 7px 12px;
+  border-radius: var(--r-pill);
+  background: var(--accent-fill); color: #fff;
+  font-size: var(--fs-11); font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  box-shadow: var(--shadow-pop);
+  pointer-events: none;
+  z-index: 6;
+}
+.drop-banner[hidden] { display: none; }
 
 
 .btn {
@@ -505,6 +603,8 @@ body.dragging-cat { cursor: grabbing; }
 @media (pointer: coarse) {
   .icon-btn { width: 44px; height: 44px; }
   .cat-more { width: 44px; height: 44px; opacity: .7; }
+  /* 触屏没有 hover：手柄常显，并放大到能按住 */
+  .cat-head .handle { width: 32px; height: 44px; opacity: .5; }
   .cat-head { min-height: 44px; }
   .ghost-btn, .mini-btn { height: 44px; }
   .btn { height: 44px; }

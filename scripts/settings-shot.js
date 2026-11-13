@@ -73,6 +73,17 @@ app.whenReady().then(async () => {
     await shot(sw, file)
   }
 
+  // 禁用态的行：滑块不能还是饱和蓝，否则看着"还能拖"
+  await evalJs(sw, "(()=>{const b=[...document.querySelectorAll('#settingsTabs .tab')].find(x=>x.textContent.trim()==='行为'); b&&b.click(); return true})()")
+  await sleep(300)
+  // 滑块伪元素的色值读不出来（getComputedStyle 对 ::-webkit-slider-thumb 返回透明），
+  // 这里只确认禁用行存在；颜色由 settings-act.png 取样核对
+  const dis = JSON.parse(await evalJs(sw, `(() => {
+    const rows = [...document.querySelectorAll('.row.is-disabled')]
+    return JSON.stringify({ disabled: rows.length, opacity: rows[0] ? getComputedStyle(rows[0]).opacity : null })
+  })()`))
+  console.log('disabled rows', JSON.stringify(dis))
+
   // 换主题：窗口底色、坞、设置内容都要跟着变
   await evalJs(sw, "(()=>{const b=[...document.querySelectorAll('#settingsTabs .tab')].find(x=>x.textContent.trim()==='外观'); b&&b.click(); return true})()")
   await sleep(400)
