@@ -1,0 +1,108 @@
+/* ============================================================
+   tokens.css — 设计令牌（唯一来源）
+   颜色 / 圆角 / 字号 / 间距只在这里定义；styles.css 只消费变量。
+   对比度按 WCAG 2.1 计算，正文与标签 ≥ 4.5:1。
+   ============================================================ */
+
+:root {
+  /* 间距：一条 4px 节奏 */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+
+  /* 圆角：只有五档 */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-pill: 999px;
+
+  /* 字号：只有三档 */
+  --fs-11: 11px;
+  --fs-12: 12px;
+  --fs-13: 13px;
+
+  /* 动效 */
+  --t-fast: 120ms;
+  --t-base: 160ms;
+  --t-panel: 220ms;
+  --ease-panel: cubic-bezier(.2, 0, 0, 1);
+
+  /* 布局（--pane-pad 必须等于 main.js 的 PAD） */
+  --pane-pad: 18px;
+  --tile: 72px;
+  --icon: 44px;
+  --col-gap: 6px;
+}
+
+/* ---------------- 深色（默认） ---------------- */
+body[data-theme="dark"] {
+  color-scheme: dark;
+
+  --surface-1: rgba(30, 33, 43, .985);
+  --surface-2: rgba(255, 255, 255, .055);
+  --surface-3: rgba(255, 255, 255, .09);
+
+  --line: rgba(255, 255, 255, .075);
+  --line-strong: rgba(255, 255, 255, .14);
+
+  --text: #E9EDF5;
+  --text-dim: #A7B0C4;
+  --muted: #8A94AC;          /* 5.3:1 on 面板底 */
+
+  --hover: rgba(255, 255, 255, .065);
+  --active: rgba(255, 255, 255, .11);
+  --field: rgba(255, 255, 255, .055);
+
+  --accent: #7EA2FF;         /* 文字 / 描边 / 焦点环 */
+  --accent-fill: #2A63F0;    /* 填充底：白字 5.1:1 */
+  --accent-soft: rgba(126, 162, 255, .16);
+  --danger: #FF6B81;
+
+  --icon-plate: transparent;
+  --menu-bg: #23262F;
+  --menu-text: #E9EDF5;
+  --cd-shade: rgba(8, 10, 16, .74);
+
+  --shadow-panel: 0 4px 16px rgba(0, 0, 0, .30), 0 1px 3px rgba(0, 0, 0, .22);
+  --shadow-pop: 0 16px 40px rgba(0, 0, 0, .42);
+  --mask: rgba(0, 0, 0, .42);
+}
+
+/* ---------------- 浅色 ---------------- */
+body[data-theme="light"] {
+  color-scheme: light;
+
+  --surface-1: rgba(255, 255, 255, .99);
+  --surface-2: rgba(16, 24, 40, .045);
+  --surface-3: rgba(16, 24, 40, .085);
+
+  --line: rgba(16, 24, 40, .09);
+  --line-strong: rgba(16, 24, 40, .16);
+
+  --text: #1B2233;
+  --text-dim: #4B5568;
+  --muted: #667085;          /* 4.97:1 on 白底 */
+
+  --hover: rgba(16, 24, 40, .05);
+  --active: rgba(16, 24, 40, .09);
+  --field: rgba(16, 24, 40, .045);
+
+  --accent: #2F6BFF;
+  --accent-fill: #2A63F0;
+  --accent-soft: rgba(47, 107, 255, .12);
+  --danger: #D62F4C;
+
+  /* 浅色下必须给图标一点底，否则白色/透明底的 Windows 图标会消失 */
+  --icon-plate: rgba(16, 24, 40, .045);
+  --menu-bg: #FFFFFF;
+  --menu-text: #1B2233;
+  --cd-shade: rgba(246, 248, 252, .80);
+
+  --shadow-panel: 0 4px 18px rgba(23, 35, 64, .16), 0 1px 3px rgba(23, 35, 64, .10);
+  --shadow-pop: 0 16px 40px rgba(23, 35, 64, .22);
+  --mask: rgba(16, 24, 40, .42);
+}

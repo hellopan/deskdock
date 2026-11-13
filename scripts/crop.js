@@ -1,0 +1,21 @@
+const { app, nativeImage } = require('electron')
+const fs = require('fs')
+const path = require('path')
+
+const src = process.argv[2] || path.join(__dirname, '.preview', 'icons-fixed.png')
+const out = process.argv[3] || path.join(__dirname, '.preview', 'crop.png')
+const x = Number(process.argv[4] || 0)
+const y = Number(process.argv[5] || 0)
+const w = Number(process.argv[6] || 900)
+const h = Number(process.argv[7] || 1600)
+
+app.whenReady().then(() => {
+  const img = nativeImage.createFromPath(src)
+  console.log('src', JSON.stringify(img.getSize()))
+  let c = img.crop({ x, y, width: w, height: h })
+  const up = Number(process.argv[8] || 1)
+  if (up > 1) c = c.resize({ width: Math.round(w * up), height: Math.round(h * up), quality: 'best' })
+  fs.writeFileSync(out, c.toPNG())
+  console.log('saved', out, JSON.stringify(c.getSize()))
+  app.quit()
+})

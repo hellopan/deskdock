@@ -1,0 +1,61 @@
+{
+  "name": "desk-dock",
+  "productName": "DeskDock",
+  "version": "1.4.1",
+  "description": "桌面坞 - 把桌面快捷方式收纳进贴边隐藏的小坞，还你一个干净的桌面",
+  "main": "src/main/main.js",
+  "author": "PZB",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hellopan/deskdock.git"
+  },
+  "homepage": "https://github.com/hellopan/deskdock#readme",
+  "bugs": {
+    "url": "https://github.com/hellopan/deskdock/issues"
+  },
+  "scripts": {
+    "start": "electron .",
+    "icon": "node scripts/gen-icon.js",
+    "pack": "electron-builder --win --dir",
+    "dist": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.pzb.deskdock",
+    "productName": "DeskDock",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "build/icon.ico",
+      "build/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "桌面坞",
+      "include": "build/installer.nsh"
+    }
+  }
+}

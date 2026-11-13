@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+  <title>桌面坞设置</title>
+  <link rel="stylesheet" href="tokens.css" />
+  <link rel="stylesheet" href="settings.css" />
+</head>
+<body data-theme="dark">
+  <div class="win">
+    <header class="whead">
+      <div class="wtitle">
+        <span class="wlogo">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="2" fill="currentColor" opacity=".95"/>
+            <rect x="14" y="3" width="7" height="7" rx="2" fill="currentColor" opacity=".55"/>
+            <rect x="3" y="14" width="7" height="7" rx="2" fill="currentColor" opacity=".55"/>
+            <rect x="14" y="14" width="7" height="7" rx="2" fill="currentColor" opacity=".3"/>
+          </svg>
+        </span>
+        <span>桌面坞设置</span>
+      </div>
+      <div class="wbtns">
+        <button class="wbtn" id="btnMin" title="最小化" aria-label="最小化窗口">
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3.5 8h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+        <button class="wbtn close" id="btnClose" title="关闭" aria-label="关闭设置">
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <nav class="tabs" id="settingsTabs" role="tablist" aria-label="设置分类"></nav>
+    <main class="body" id="settingsBody" role="tabpanel" tabindex="0"></main>
+  </div>
+
+  <div class="modal-mask" id="mask" hidden>
+    <div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="对话框"></div>
+  </div>
+  <div class="toast-wrap" id="toasts"></div>
+
+  <script src="settings.js"></script>
+</body>
+</html>

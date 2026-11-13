@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+  <title>桌面坞</title>
+  <link rel="stylesheet" href="tokens.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-edge="left" data-theme="dark">
+  <div class="panel" id="panel">
+    <div class="peek-bar"></div>
+
+    <header class="header" id="header">
+      <div class="brand">
+        <div class="logo">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="2" fill="currentColor" opacity=".95"/>
+            <rect x="14" y="3" width="7" height="7" rx="2" fill="currentColor" opacity=".55"/>
+            <rect x="3" y="14" width="7" height="7" rx="2" fill="currentColor" opacity=".55"/>
+            <rect x="14" y="14" width="7" height="7" rx="2" fill="currentColor" opacity=".3"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="title">桌面坞</span>
+          <span class="sub" id="subCount">0 个快捷方式</span>
+        </div>
+      </div>
+      <div class="tools">
+        <button class="icon-btn" id="btnSearch" title="搜索" aria-label="搜索">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.75"/><path d="M16 16l4.2 4.2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+        </button>
+        <button class="icon-btn" id="btnImport" title="从桌面导入" aria-label="从桌面导入">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 4v10m0 0l-3.6-3.6M12 14l3.6-3.6" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 16.5v1.8A1.7 1.7 0 006.7 20h10.6a1.7 1.7 0 001.7-1.7v-1.8" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+        </button>
+        <button class="icon-btn" id="btnPin" title="固定显示" aria-label="固定显示" aria-pressed="false">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 4h6l-.7 5.2 3.4 3.1-1.2 1.6H13v6l-1 1.4-1-1.4v-6H6.5L5.3 12.3l3.4-3.1L9 4z" fill="currentColor" opacity=".9"/></svg>
+        </button>
+        <button class="icon-btn" id="btnSettings" title="设置" aria-label="设置" aria-haspopup="dialog">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 7h3M11 7h9M4 12h9M17 12h3M4 17h5M13 17h7" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><circle cx="9" cy="7" r="1.9" fill="none" stroke="currentColor" stroke-width="1.75"/><circle cx="15" cy="12" r="1.9" fill="none" stroke="currentColor" stroke-width="1.75"/><circle cx="11" cy="17" r="1.9" fill="none" stroke="currentColor" stroke-width="1.75"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="searchbar" id="searchbar" hidden>
+      <input id="searchInput" type="text" placeholder="搜索快捷方式…" spellcheck="false" />
+      <button class="mini-btn" id="btnSearchClose">取消</button>
+    </div>
+
+    <main class="list" id="list"></main>
+
+    <footer class="footer">
+      <button class="ghost-btn" id="btnAddCat">
+        <svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        新建分类
+      </button>
+      <span class="hint" id="hint">拖图标可换分类</span>
+    </footer>
+  </div>
+
+  <!-- 通用弹窗 -->
+  <div class="modal-mask" id="mask" hidden>
+    <div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="对话框"></div>
+  </div>
+  <div class="toast-wrap" id="toasts" aria-live="polite" aria-atomic="false"></div>
+
+  <script src="icons.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>
