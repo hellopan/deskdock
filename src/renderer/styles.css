@@ -68,9 +68,9 @@ body.is-hidden .peek-bar { opacity: 1; }
   display: flex;
   align-items: center;
   gap: var(--s2);
-  min-height: 48px;
-  padding: var(--s2) var(--s3);
-  border-bottom: 1px solid var(--line);
+  min-height: 78px;
+  padding: var(--s4) var(--s3);
+  border-bottom: 0;
   cursor: grab;
 }
 .header:active { cursor: grabbing; }
@@ -85,12 +85,17 @@ body[data-edge="top"] .header, body[data-edge="bottom"] .header { border-bottom:
   flex: none;
 }
 .brand-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
-.brand-text .title { font-size: var(--fs-13); font-weight: 600; }
+.brand-text .title { font-size: var(--fs-title); font-weight: 600; }
 .brand-text .sub { font-size: var(--fs-11); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.tools { display: flex; gap: 2px; flex: none; }
+.tools {
+  display: flex; gap: 2px; flex: none; padding: 4px;
+  border-radius: var(--r-pill); border: 1px solid var(--glass-edge);
+  background: var(--glass); background-image: var(--glass-sheen);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.4); box-shadow: var(--shadow-glass);
+}
 .icon-btn {
-  width: 32px; height: 32px; border: 0; border-radius: var(--r-sm);
+  width: 32px; height: 32px; border: 0; border-radius: var(--r-pill);
   background: transparent; color: var(--text-dim);
   display: grid; place-items: center; cursor: pointer;
   transition: background var(--t-fast) ease, color var(--t-fast) ease, transform var(--t-fast) ease;
@@ -617,3 +622,37 @@ body.dragging-cat { cursor: grabbing; }
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
   .panel { transition: none; }
 }
+
+/* Liquid Glass dock: content is quiet, controls float above it. */
+.panel { background-image: var(--ambient); border-color: var(--glass-edge); backdrop-filter: blur(var(--glass-blur)) saturate(1.25); }
+.logo { width: 32px; height: 32px; border-radius: var(--r-sm); background-image: var(--glass-sheen); box-shadow: inset 0 1px 0 var(--glass-edge); }
+.brand-text { gap: 3px; }
+.brand-text .sub { font-variant-numeric: tabular-nums; }
+.list { padding-top: 0; }
+.cat { margin-bottom: var(--s3); }
+.cat-head { min-height: 36px; background: var(--surface-solid); box-shadow: none; border-radius: var(--r-sm); backdrop-filter: blur(20px); }
+.cat-head:hover { background: var(--surface-solid); }
+.cat-name { color: var(--text); font-size: var(--fs-13); }
+.cat-count { padding: 2px 7px; background: var(--surface-2); border-radius: var(--r-pill); font-variant-numeric: tabular-nums; }
+.cat-more { opacity: .65; }
+.cat-caret { transition: transform var(--t-base) var(--ease-spring); }
+.grid { padding-top: var(--s2); row-gap: var(--s2); }
+.tile { gap: 6px; transition: background var(--t-fast) ease, transform 320ms var(--ease-spring); }
+.tile:hover { background: var(--surface-2); transform: translateY(-2px); }
+.tile:active { transform: scale(.92); background: var(--active); }
+.tile .ico { border-radius: 23%; transition: filter var(--t-base) ease; }
+.tile:hover .ico { filter: drop-shadow(0 3px 4px var(--line-strong)); }
+.tile .label { color: var(--text-dim); }
+.tile.dragging { transform: scale(.95); }
+.footer { padding: var(--s2) var(--s3) var(--s3); border-top: 0; }
+.ghost-btn { color: var(--accent); background: var(--accent-soft); }
+.hint { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.searchbar { padding-top: 0; border: 0; animation: search-in var(--t-base) var(--ease-panel); }
+.searchbar input { height: 36px; border-radius: var(--r-pill); border-color: transparent; padding: 0 var(--s4); }
+.mini-btn { color: var(--accent); border: 0; }
+.results { gap: var(--s1); }
+.res-row { height: 48px; background: var(--surface-2); transition: background var(--t-fast), transform var(--t-base) var(--ease-spring); }
+.res-row:active { transform: scale(.98); }
+.dropzone { background: var(--surface-2); }
+@keyframes search-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+@media (pointer: coarse) { .header { flex-wrap: wrap; } }

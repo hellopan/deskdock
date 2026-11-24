@@ -13,8 +13,8 @@ const store = require('./store')
 const winicon = require('./winicon')
 
 const PAD = 18            // 窗口内留给阴影的透明边距（要和 styles.css 的 --pane-pad 一致）
-const PANEL_LENGTH = 780  // 竖排时坞的长边最大长度
-const MAX_COLS = 10       // 每排最多显示 10 个快捷方式
+const PANEL_LENGTH = 780  // 四个停靠方向共用的默认高度
+const MAX_COLS = 20       // 每排最多显示 20 个快捷方式
 const MIN_COLS = 4        // 每排最少 4 个（与 store.js 的 columns 夹取一致）
 const COL_GAP = 6         // 磁贴列间距（与 styles.css 的 .grid 列间距保持一致）
 const PANEL_CHROME = 32   // 面板左右边框 2 + 列表左右内边距 24 + 竖向滚动条 6
@@ -132,7 +132,7 @@ function clamp(v, min, max) {
   return Math.max(min, Math.min(max, v))
 }
 
-/* 每排图标个数：由设置决定（4–10），不再按内容推导，宽度因此稳定 */
+/* 每排图标个数：由设置决定（4–20），不再按内容推导，宽度因此稳定 */
 function dockCols() {
   return clamp(Math.round(Number(settings().columns) || 6), MIN_COLS, MAX_COLS)
 }
@@ -148,13 +148,14 @@ function geometry() {
   const s = settings()
   const edge = s.edge
   const vertical = isVerticalEdge()
+  const panelHeight = Math.min(wa.height - 40, clamp(Number(s.panelHeight) || PANEL_LENGTH, 220, 1200))
 
   if (vertical) {
-    /* 宽度跟着内容走：最多 10 列，屏幕放不下再逐列退让 */
+    /* 宽度跟着内容走：最多 20 列，屏幕放不下再逐列退让 */
     let cols = dockCols()
     while (cols > 1 && panelWidthFor(cols) > wa.width - 60) cols--
     const thick = panelWidthFor(cols)
-    const length = Math.min(wa.height - 40, PANEL_LENGTH)
+    const length = panelHeight
     const defOffset = Math.round(wa.y + (wa.height - length) / 2)
     const offset = s.offset == null ? defOffset : clamp(s.offset, wa.y, wa.y + wa.height - length)
     const px = edge === 'left' ? wa.x : wa.x + wa.width - thick
@@ -167,7 +168,7 @@ function geometry() {
 
   /* 贴上下边：宽度占本屏宽度的 80%，居中 */
   const length = Math.min(Math.round(wa.width * 0.8), wa.width - 40)
-  const hThick = clamp(s.thickness || 330, 220, 460)
+  const hThick = panelHeight
   const maxX = wa.x + wa.width - length
   const offset = s.offset == null ? Math.round(wa.x + (wa.width - length) / 2) : clamp(s.offset, wa.x, maxX)
   const py = edge === 'top' ? wa.y : wa.y + wa.height - hThick
@@ -450,7 +451,23 @@ function broadcastAll(channel, payload) {
  */
 
 const SETTINGS_W = 780
-const SETTINGS_H = 620
+const SETTINGS_H = 920
+
+// Clip the native window as well as the CSS surface, retaining resize support.
+function shapeSettingsWindow() {
+  if (!settingsWindowExists() || !['win32', 'linux'].includes(process.platform)) return
+  const [width, height] = settingsWin.getSize()
+  const radius = Math.min(settingsWin._cornerRadius || 28, width / 2, height / 2)
+  const rows = []
+  for (let y = 0; y < Math.ceil(radius); y++) {
+    const dy = radius - y - .5
+    const inset = Math.ceil(radius - Math.sqrt(Math.max(0, radius * radius - dy * dy)))
+    rows.push({ x: inset, y, width: width - inset * 2, height: 1 })
+    rows.push({ x: inset, y: height - y - 1, width: width - inset * 2, height: 1 })
+  }
+  rows.push({ x: 0, y: Math.ceil(radius), width, height: height - Math.ceil(radius) * 2 })
+  settingsWin.setShape(rows)
+}
 
 function settingsWindowExists() {
   return !!(settingsWin && !settingsWin.isDestroyed())
@@ -463,7 +480,7 @@ function settingsWindowActive() {
 }
 
 function chromeColor(theme) {
-  return theme === 'light' ? '#ffffff' : '#1e212b'
+  return theme === 'light' ? '#f2f2f7' : '#18191c'
 }
 
 /** 把设置窗口摆在坞的反方向：坞在左就靠右，避免盖住正在调整的坞 */
@@ -500,6 +517,8 @@ function openSettingsWindow(tab) {
   const theme = settings().theme
   settingsWin = new BrowserWindow({
     ...settingsBounds(),
+    parent: win,           // 非模态子窗口：始终在坞之上，坞仍可交互
+    alwaysOnTop: true,
     minWidth: 600,
     minHeight: 440,
     show: false,
@@ -517,13 +536,23 @@ function openSettingsWindow(tab) {
     }
   })
 
+  settingsWin.setAlwaysOnTop(true, 'floating')
   settingsWin.loadFile(path.join(__dirname, '../renderer/settings.html'))
 
-  settingsWin.once('ready-to-show', () => {
+  settingsWin.on('resize', shapeSettingsWindow)
+  settingsWin.once('ready-to-show', async () => {
     if (!settingsWin || settingsWin.isDestroyed()) return
     // 跨 DPI 屏幕创建窗口时，Chromium 会按主屏的缩放因子算一遍尺寸，
     // 到 ready 之后按目标屏再设一次，窗口才是我们要的 DIP 大小
     try { settingsWin.setBounds(settingsBounds()) } catch { /* ignore */ }
+    const current = settingsWin
+    let radius
+    try {
+      radius = await current.webContents.executeJavaScript("parseFloat(getComputedStyle(document.querySelector('.win')).borderTopLeftRadius)")
+    } catch { return }
+    if (current.isDestroyed() || current !== settingsWin) return
+    current._cornerRadius = radius
+    shapeSettingsWindow()
     settingsWin.show()
     settingsWin.focus()
     dbg('settings-open', JSON.stringify(settingsWin.getBounds()))
@@ -732,7 +761,7 @@ function fixIpc() {
   // ---- 设置
   ipcMain.handle('settings:update', (_e, patch) => {
     const s = store.updateSettings(patch)
-    if (patch && ('thickness' in patch || 'tileSize' in patch || 'columns' in patch)) relayout()
+    if (patch && ('panelHeight' in patch || 'tileSize' in patch || 'columns' in patch)) relayout()
     if (patch && 'edge' in patch) {
       store.updateSettings({ offset: null })
       relayout()
@@ -753,6 +782,7 @@ function fixIpc() {
   // ---- 设置窗口（独立窗口）
   ipcMain.handle('settings:open', (_e, tab) => openSettingsWindow(tab))
   ipcMain.handle('settings:close', () => closeSettingsWindow())
+  ipcMain.handle('app:github', () => shell.openExternal('https://github.com/hellopan/deskdock'))
   // 窗口背景色跟主题走，缩放/重绘时不会闪一下白底
   ipcMain.handle('settings:chrome', (e, theme) => {
     const w = BrowserWindow.fromWebContents(e.sender)

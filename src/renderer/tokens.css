@@ -14,22 +14,22 @@
   --s6: 24px;
 
   /* 圆角：只有五档 */
-  --r-xs: 6px;
-  --r-sm: 8px;
-  --r-md: 10px;
-  --r-lg: 14px;
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 28px;
   --r-pill: 999px;
 
-  /* 字号：只有三档 */
+  /* 紧凑字号；标题层级见下方扩展 */
   --fs-11: 11px;
   --fs-12: 12px;
   --fs-13: 13px;
 
   /* 动效 */
-  --t-fast: 120ms;
-  --t-base: 160ms;
-  --t-panel: 220ms;
-  --ease-panel: cubic-bezier(.2, 0, 0, 1);
+  --t-fast: 140ms;
+  --t-base: 260ms;
+  --t-panel: 420ms;
+  --ease-panel: cubic-bezier(.22, 1, .36, 1);
 
   /* 布局（--pane-pad 必须等于 main.js 的 PAD） */
   --pane-pad: 18px;
@@ -42,29 +42,29 @@
 body[data-theme="dark"] {
   color-scheme: dark;
 
-  --surface-1: rgba(30, 33, 43, .985);
+  --surface-1: rgba(30, 31, 35, .94);
   --surface-2: rgba(255, 255, 255, .055);
   --surface-3: rgba(255, 255, 255, .09);
 
   --line: rgba(255, 255, 255, .075);
   --line-strong: rgba(255, 255, 255, .14);
 
-  --text: #E9EDF5;
-  --text-dim: #A7B0C4;
-  --muted: #8A94AC;          /* 5.3:1 on 面板底 */
+  --text: #F5F5F7;
+  --text-dim: #C7C7CC;
+  --muted: #A0A1A8;
 
   --hover: rgba(255, 255, 255, .065);
   --active: rgba(255, 255, 255, .11);
   --field: rgba(255, 255, 255, .055);
 
-  --accent: #7EA2FF;         /* 文字 / 描边 / 焦点环 */
-  --accent-fill: #2A63F0;    /* 填充底：白字 5.1:1 */
+  --accent: #69B1FF;         /* 文字 / 描边 / 焦点环 */
+  --accent-fill: #006BE6;    /* 主按钮填充 */
   --accent-soft: rgba(126, 162, 255, .16);
-  --danger: #FF6B81;
+  --danger: #FF7B80;
 
   --icon-plate: transparent;
   --menu-bg: #23262F;
-  --menu-text: #E9EDF5;
+  --menu-text: #F5F5F7;
   --cd-shade: rgba(8, 10, 16, .74);
 
   --shadow-panel: 0 4px 16px rgba(0, 0, 0, .30), 0 1px 3px rgba(0, 0, 0, .22);
@@ -76,33 +76,61 @@ body[data-theme="dark"] {
 body[data-theme="light"] {
   color-scheme: light;
 
-  --surface-1: rgba(255, 255, 255, .99);
+  --surface-1: rgba(248, 248, 251, .96);
   --surface-2: rgba(16, 24, 40, .045);
   --surface-3: rgba(16, 24, 40, .085);
 
   --line: rgba(16, 24, 40, .09);
   --line-strong: rgba(16, 24, 40, .16);
 
-  --text: #1B2233;
-  --text-dim: #4B5568;
-  --muted: #667085;          /* 4.97:1 on 白底 */
+  --text: #1C1C1E;
+  --text-dim: #48484E;
+  --muted: #6A6A73;
 
   --hover: rgba(16, 24, 40, .05);
   --active: rgba(16, 24, 40, .09);
   --field: rgba(16, 24, 40, .045);
 
-  --accent: #2F6BFF;
-  --accent-fill: #2A63F0;
+  --accent: #0062CC;
+  --accent-fill: #006BE6;
   --accent-soft: rgba(47, 107, 255, .12);
-  --danger: #D62F4C;
+  --danger: #C92B34;
 
   /* 浅色下必须给图标一点底，否则白色/透明底的 Windows 图标会消失 */
   --icon-plate: rgba(16, 24, 40, .045);
   --menu-bg: #FFFFFF;
-  --menu-text: #1B2233;
+  --menu-text: #1C1C1E;
   --cd-shade: rgba(246, 248, 252, .80);
 
   --shadow-panel: 0 4px 18px rgba(23, 35, 64, .16), 0 1px 3px rgba(23, 35, 64, .10);
   --shadow-pop: 0 16px 40px rgba(23, 35, 64, .22);
   --mask: rgba(16, 24, 40, .42);
+}
+
+/* iOS-inspired material and typography extensions. */
+:root {
+  --fs-body: 14px; --fs-title: 20px; --fs-large: 30px;
+  --font-system: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  --ease-spring: cubic-bezier(.22, 1.28, .36, 1);
+  --white: #fff; --switch-on: #34c759; --glass-blur: 28px;
+}
+body[data-theme="dark"] {
+  --win-bg: #18191c; --surface-solid: #232428; --group-bg: #25262a;
+  --glass: rgba(65,67,73,.64); --glass-edge: rgba(255,255,255,.20); --glass-light: rgba(255,255,255,.10);
+  --glass-sheen: linear-gradient(145deg, rgba(255,255,255,.13), transparent 42%, rgba(255,255,255,.025));
+  --menu-bg: rgba(44,45,49,.97);
+  --shadow-panel: 0 6px 18px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.14);
+  --shadow-pop: 0 20px 60px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.15);
+  --shadow-glass: 0 3px 12px rgba(0,0,0,.12), inset 0 1px 0 var(--glass-edge);
+  --ambient: radial-gradient(ellipse at 5% 0%, rgba(100,140,200,.085), transparent 55%);
+}
+body[data-theme="light"] {
+  --win-bg: #f2f2f7; --surface-solid: #f2f2f7; --group-bg: #fff;
+  --glass: rgba(255,255,255,.70); --glass-edge: rgba(255,255,255,.92); --glass-light: rgba(255,255,255,.65);
+  --glass-sheen: linear-gradient(145deg, rgba(255,255,255,.8), transparent 42%, rgba(255,255,255,.18));
+  --menu-bg: rgba(255,255,255,.98);
+  --shadow-panel: 0 6px 18px rgba(30,40,65,.14), inset 0 1px 0 var(--white);
+  --shadow-pop: 0 20px 60px rgba(30,40,65,.20), inset 0 1px 0 var(--white);
+  --shadow-glass: 0 3px 12px rgba(30,40,65,.07), inset 0 1px 0 var(--glass-edge);
+  --ambient: radial-gradient(ellipse at 5% 0%, rgba(120,170,255,.09), transparent 55%);
 }

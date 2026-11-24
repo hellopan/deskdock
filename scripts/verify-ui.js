@@ -131,12 +131,13 @@ app.whenReady().then(async () => {
     const m = JSON.parse(await evalJs(dock, METRICS))
     const wa = screen.getDisplayMatching(b).workArea
     const expW = Math.min(Math.round(wa.width * 0.8), wa.width - 40)
-    const expH = Math.min(Math.max(Number(s.thickness) || 330, 220), 460)
+    const expH = Math.min(wa.height - 40, Math.max(220, Math.min(Number(s.panelHeight) || 780, 1200)))
 
     check(`edge=${edge} 面板宽 = 屏宽 80%`, Math.abs(m.panelW - expW) <= 1, `${m.panelW} vs ${expW}`)
-    check(`edge=${edge} 面板高 = thickness`, Math.abs(m.panelH - expH) <= 1, `${m.panelH} vs ${expH}`)
+    check(`edge=${edge} 面板高 = 共享高度`, Math.abs(m.panelH - expH) <= 1, `${m.panelH} vs ${expH}`)
     check(`edge=${edge} 贴边位置正确`,
-      edge === 'top' ? b.y === wa.y - 18 : b.y + b.height === wa.y + wa.height + 18,
+      // DIP coordinates may round by one pixel on a 125% display.
+      Math.abs(edge === 'top' ? b.y - (wa.y - 18) : b.y + b.height - (wa.y + wa.height + 18)) <= 1,
       `win=${JSON.stringify(b)} wa=${JSON.stringify(wa)}`)
     check(`edge=${edge} 无横向溢出`, !m.overflowX, `docW=${m.docW} iw=${m.iw}`)
     check(`edge=${edge} 列表宽度未被撑破`, m.listScrollW <= m.listW + 1, `scrollW=${m.listScrollW} clientW=${m.listW}`)
@@ -453,7 +454,7 @@ app.whenReady().then(async () => {
       chips: rows.filter((r) => r.querySelector('.res-cat')).length,
       marks: rows.filter((r) => r.querySelector('.res-name mark')).length,
       catHidden: getComputedStyle(document.querySelector('.cat')).display === 'none',
-      hint: document.querySelector('#hint').textContent
+      hint: document.querySelector('#hint')?.textContent || ''
     })
   })()`))
   check('H1 命中条数与数据一致', s1.rows === s1.expected && s1.expected > 0, `${s1.rows}/${s1.expected}`)
@@ -461,7 +462,7 @@ app.whenReady().then(async () => {
   check('H3 每行都有分类 chip', s1.chips === s1.rows, `${s1.chips}/${s1.rows}`)
   check('H4 命中片段高亮为 mark', s1.marks > 0, `${s1.marks} 行`)
   check('H5 搜索时分类网格隐藏', s1.catHidden === true)
-  check('H6 底栏提示改成 Esc 退出搜索', s1.hint === 'Esc 退出搜索', s1.hint)
+  check('H6 搜索不显示解释性文案', s1.hint === '', s1.hint)
 
   const s2 = JSON.parse(await evalJs(dock, `(() => {
     const i = document.querySelector('#searchInput')
@@ -511,7 +512,7 @@ app.whenReady().then(async () => {
       dragClass: document.body.classList.contains('is-file-drag'),
       target: document.querySelector('.cat.file-target .cat-name')?.textContent || null,
       banner: banner.hidden ? null : banner.textContent,
-      hint: document.querySelector('#hint').textContent
+      hint: document.querySelector('#hint')?.textContent || ''
     }
     fire('dragleave', document.querySelector('#panel'))
     await new Promise((res) => setTimeout(res, 280))
@@ -519,7 +520,7 @@ app.whenReady().then(async () => {
       dragClass: document.body.classList.contains('is-file-drag'),
       target: !!document.querySelector('.cat.file-target'),
       bannerHidden: banner.hidden,
-      hint: document.querySelector('#hint').textContent
+      hint: document.querySelector('#hint')?.textContent || ''
     }
     return JSON.stringify({ name, on, off })
   })()`))
@@ -527,7 +528,7 @@ app.whenReady().then(async () => {
   check('I2 指针所在分类被高亮', dragInfo.on.target === dragInfo.name, `${dragInfo.on.target} / ${dragInfo.name}`)
   check('I3 横幅写明松手会进哪个分类', (dragInfo.on.banner || '').includes(dragInfo.name), dragInfo.on.banner)
   check('I4 拖入时底栏不重复同一句', dragInfo.on.hint === '', JSON.stringify(dragInfo.on.hint))
-  check('I5 离开后反馈全部撤销', !dragInfo.off.dragClass && !dragInfo.off.target && dragInfo.off.bannerHidden && dragInfo.off.hint === '拖图标可换分类',
+  check('I5 离开后反馈全部撤销', !dragInfo.off.dragClass && !dragInfo.off.target && dragInfo.off.bannerHidden && dragInfo.off.hint === '',
     JSON.stringify(dragInfo.off))
 
   /* ------------------------------------------------------------- J 图钉 */
@@ -572,13 +573,15 @@ app.whenReady().then(async () => {
     const head = tallest.querySelector('.cat-head')
     const hr = head.getBoundingClientRect()
     const heads = [...document.querySelectorAll('.cat-head')]
-    const stuck = heads.filter((h) => Math.abs(h.getBoundingClientRect().top - lr.top - 8) <= 2)
+    const contentTop = parseFloat(getComputedStyle(list).paddingTop)
+    const stuck = heads.filter((h) => Math.abs(h.getBoundingClientRect().top - lr.top - contentTop) <= 2)
       .map((h) => h.querySelector('.cat-name').textContent)
     const out = {
       scrolled: Math.round(list.scrollTop),
       sh: list.scrollHeight, ch: list.clientHeight,
       tallestName: head.querySelector('.cat-name').textContent,
       headTop: Math.round(hr.top - lr.top),
+      expectedTop: contentTop,
       stuck,
       insideSection: hr.bottom <= tallest.getBoundingClientRect().bottom + 1,
       // 吸住的标题必须盖住磁贴：取它下沿往上 2px 的像素，不应还看到磁贴
@@ -589,7 +592,7 @@ app.whenReady().then(async () => {
     return JSON.stringify(out)
   })()`))
   check('K1 列表可滚动（测试前提）', sticky.scrolled > 0, JSON.stringify(sticky))
-  check('K2 当前分组标题吸在列表顶部', sticky.headTop === 8, `${sticky.tallestName} top=${sticky.headTop}`)
+  check('K2 当前分组标题吸在列表顶部', Math.abs(sticky.headTop - sticky.expectedTop) <= 1, `${sticky.tallestName} top=${sticky.headTop}`)
   check('K3 同时只有一个标题吸顶', sticky.stuck.length === 1 && sticky.stuck[0] === sticky.tallestName, JSON.stringify(sticky.stuck))
   check('K4 吸顶没有越过所属分组', sticky.insideSection === true)
   check('K5 吸顶标题是不透明底', sticky.opaque === true)

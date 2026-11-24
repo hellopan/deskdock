@@ -113,13 +113,13 @@ app.whenReady().then(async () => {
   const tile = Number(process.env.SHOT_TILE) || 72
   const colGap = 6
   const panelChrome = 32
-  const cols = vertical ? Math.max(4, Math.min(10, Number(process.env.SHOT_COLS) || 6)) : 0
+  const cols = vertical ? Math.max(4, Math.min(20, Number(process.env.SHOT_COLS) || 6)) : 0
   const panelW = vertical ? panelChrome + cols * tile + (cols - 1) * colGap : 1536
 
   const statePayload = {
     settings: {
       edge, autoHide: true, pinned: false, peek: 4, hideDelay: 550,
-      thickness: 330, columns: vertical ? cols : 6, iconSize: 44, tileSize: tile, theme,
+      panelHeight: 780, columns: vertical ? cols : 6, iconSize: 44, tileSize: tile, theme,
       launchAtLogin: false, showLabels: true, offset: null, cooldownMs: 2000
     },
     categories: CATS,
@@ -183,7 +183,7 @@ app.whenReady().then(async () => {
   const focusMode = process.env.SHOT_FOCUSED === '1'
   const win = new BrowserWindow({
     width: vertical ? panelW + 36 : 1536,
-    height: vertical ? 780 : 330 + 36,
+    height: vertical ? 780 : 780 + 36,
     show: focusMode,
     frame: false,
     transparent: true,

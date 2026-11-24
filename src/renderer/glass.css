@@ -1,0 +1,35 @@
+/* Shared material and feedback for both windows. */
+html, body { font-family: var(--font-system); -webkit-font-smoothing: antialiased; }
+button, input { -webkit-tap-highlight-color: transparent; }
+button { touch-action: manipulation; }
+.icon-btn, .mini-btn, .ghost-btn, .btn, .wbtn, .step-btn, .seg button, .tab {
+  transition: background var(--t-fast) ease, color var(--t-fast) ease,
+    box-shadow var(--t-base) ease, transform var(--t-base) var(--ease-spring);
+}
+:is(.icon-btn, .mini-btn, .ghost-btn, .btn, .wbtn, .step-btn, .seg button, .tab):active:not(:disabled) { transform: scale(.93); }
+button:disabled { cursor: default; opacity: .45; }
+.btn, .mini-btn, .ghost-btn { border-radius: var(--r-pill); }
+.btn { min-height: 34px; }
+.btn.primary { box-shadow: inset 0 1px 0 var(--glass-light); }
+.btn:focus-visible, .icon-btn:focus-visible { outline-offset: 3px; }
+.modal, .picker-menu, .toast { backdrop-filter: blur(var(--glass-blur)) saturate(1.4); background-image: var(--glass-sheen); }
+.modal { background-color: var(--menu-bg); border-color: var(--glass-edge); animation: glass-dialog-in 360ms var(--ease-spring); }
+.modal-head { padding: var(--s5) var(--s5) var(--s3); font-size: var(--fs-title); }
+.modal-body { padding-left: var(--s5); padding-right: var(--s5); }
+.modal-foot { padding: var(--s4) var(--s5) var(--s5); }
+.modal-mask { backdrop-filter: blur(5px); }
+.toast { background-color: var(--menu-bg); color: var(--text); border: 1px solid var(--glass-edge); border-radius: var(--r-pill); box-shadow: var(--shadow-pop); animation: glass-toast-in 360ms var(--ease-spring); }
+.toast.err { background: var(--menu-bg); color: var(--danger); }
+.toast.ok { background: var(--menu-bg); color: var(--text); }
+.picker-menu { border-radius: var(--r-md); border-color: var(--glass-edge); }
+input[type="text"]::placeholder { color: var(--muted); }
+@keyframes glass-dialog-in { from { opacity: 0; transform: translateY(18px) scale(.93); } to { opacity: 1; transform: none; } }
+@keyframes glass-toast-in { from { opacity: 0; transform: translateY(16px) scale(.94); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-transparency: reduce) {
+  body { --glass: var(--surface-solid); --surface-1: var(--surface-solid); --menu-bg: var(--surface-solid); }
+  .panel, .tools, .tabs, .modal, .toast, .cat-head { backdrop-filter: none !important; }
+}
+@media (prefers-contrast: more) { body { --line: var(--muted); --line-strong: var(--muted); --glass-edge: var(--muted); } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

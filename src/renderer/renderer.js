@@ -129,8 +129,8 @@ function updateTile(t, item) {
   const missing = !!item.missing
   if (t.classList.contains('missing') !== missing) t.classList.toggle('missing', missing)
   const title = missing
-    ? `${item.name}\n⚠️ 快捷方式文件已丢失，可在 设置 → 数据 → 修复失效项 处理`
-    : `${item.name}\n右键更多操作`
+    ? `${item.name}\n快捷方式已失效`
+    : item.name
   if (t.title !== title) t.title = title
   // 关掉"显示名称"后标签是 display:none，没有 aria-label 就成无名按钮了
   if (t.getAttribute('aria-label') !== item.name) t.setAttribute('aria-label', item.name)
@@ -266,7 +266,13 @@ function setCollapsed(sec, on) {
 
 /* 折叠并落盘。搜索时分类是强制展开的，这种情况下不写回配置。 */
 function toggleCategory(sec, next) {
+  const before = sec.getBoundingClientRect().height
+  window.glassUI.cancel(sec)
   setCollapsed(sec, next)
+  const after = sec.getBoundingClientRect().height
+  window.glassUI.animate(sec, [{ height: before + 'px', overflow: 'clip' }, { height: after + 'px', overflow: 'clip' }],
+    { duration: 300, easing: 'cubic-bezier(.22,1,.36,1)' })
+  if (!next) window.glassUI.reveal(sec.querySelector('.grid'))
   api.collapseCategory(sec.dataset.id, next)
 }
 
@@ -327,7 +333,7 @@ function syncGrid(rec, items) {
     if (dz) dz.remove()
   } else if (!dz) {
     const zone = el('div', 'dropzone')
-    zone.appendChild(el('span', 'dz-text', '拖快捷方式到这里'))
+    zone.setAttribute('aria-label', '空分类')
     grid.appendChild(zone)
   }
 
@@ -450,19 +456,19 @@ function paintList() {
     resetList()
     $('#subCount').textContent = '0 个快捷方式'
     const box = el('div', 'empty full')
-    box.innerHTML = '<b>坞里还是空的</b><br>点下面的按钮，把桌面上的快捷方式一次收进来<br>也可以直接把 .lnk 文件拖到窗口里'
+    box.innerHTML = '<b>暂无快捷方式</b>'
     const btn = el('button', 'btn primary sm', '从桌面导入快捷方式')
     btn.addEventListener('click', importFlow)
     box.appendChild(btn)
     setListMessage(box)
-    paintHint()
+
     return
   }
 
   // 搜索走独立的结果列表：分类网格帮不上"命中在哪、还有几条"
   if (ql) {
     paintResults(q, ql)
-    paintHint()
+
     return
   }
 
@@ -503,7 +509,7 @@ function paintList() {
   for (const [id, t] of view.tiles) if (!t.isConnected) view.tiles.delete(id)
   // 键盘焦点环跟着节点走，节点没了就一起清掉
   if (kbTile && !kbTile.isConnected) kbTile = null
-  paintHint()
+
 }
 
 /* ------------------------------------------------ 搜索结果 */
@@ -626,18 +632,6 @@ function resetSearch() {
   if (input) input.focus()
 }
 
-/* 底栏提示跟着当前处境走：空坞里没有图标可拖，搜索里该讲怎么退出。
-   文件拖入时不在这里重复 —— 底部横幅已经写明去向，两处同文只是噪声。 */
-function paintHint() {
-  const hint = $('#hint')
-  if (!hint) return
-  let text = '拖图标可换分类'
-  if (document.body.classList.contains('is-file-drag')) text = ''
-  else if (query.trim()) text = 'Esc 退出搜索'
-  else if (!state.items.length) text = '把 .lnk 文件拖进来即可添加'
-  if (hint.textContent !== text) hint.textContent = text
-}
-
 /* ------------------------------------------------ 从资源管理器拖文件 */
 let fileDragCat = null
 let fileDragTimer = 0
@@ -658,7 +652,7 @@ function setFileDrag(on, catId) {
     document.querySelectorAll('#list .cat.file-target').forEach((s) => s.classList.remove('file-target'))
     fileDragCat = null
     if (banner) banner.hidden = true
-    paintHint()
+
     return
   }
   document.body.classList.add('is-file-drag')
@@ -675,7 +669,7 @@ function setFileDrag(on, catId) {
     if (banner.textContent !== text) banner.textContent = text
     banner.hidden = false
   }
-  paintHint()
+
 }
 
 /* --------------------------------------------------- 分类拖动排序 */
@@ -752,16 +746,19 @@ function startCatDrag(e, sec) {
 let modalPrevFocus = null
 
 function closeModal() {
-  $('#mask').hidden = true
-  $('#modal').innerHTML = ''
-  document.querySelectorAll('.picker-menu').forEach((n) => n.remove())
-  // 弹窗关掉后把焦点还给打开它的那个按钮，键盘用户不会掉到页面开头
-  if (modalPrevFocus && modalPrevFocus.isConnected) modalPrevFocus.focus({ preventScroll: true })
+  const previous = modalPrevFocus
   modalPrevFocus = null
+  document.querySelectorAll('.picker-menu').forEach((n) => n.remove())
+  window.glassUI.closeDialog($('#mask'), $('#modal'), () => {
+    $('#mask').hidden = true
+    $('#modal').innerHTML = ''
+    if (previous && previous.isConnected) previous.focus({ preventScroll: true })
+  })
 }
 
 function openModal(build) {
   const modal = $('#modal')
+  window.glassUI.openDialog($('#mask'), modal)
   modal.innerHTML = ''
   // 自绘下拉的浮层挂在 body 上，换/关弹窗时要一起清掉
   document.querySelectorAll('.picker-menu').forEach((n) => n.remove())
@@ -1020,24 +1017,13 @@ async function importFlow() {
     const cbKeep = document.createElement('input')
     cbKeep.type = 'checkbox'
     cbKeep.checked = state.settings.importKeepCategory !== false
-    keepRow.append(cbKeep, document.createTextNode('已配置过分类的快捷方式，仍放回原分类'))
+    keepRow.append(cbKeep, document.createTextNode('保留原分类'))
     body.appendChild(keepRow)
-
-    const hint = el('div', 'import-hint')
-    body.appendChild(hint)
 
     const syncLabels = () => {
       const keep = cbKeep.checked
       selLabel.textContent = keep ? '新条目放入' : '全部放入'
-      for (const t of tags) {
-        t.hidden = !keep
-      }
-      const n = tags.length
-      hint.textContent = n
-        ? keep
-          ? `其中 ${n} 个在坞里已有记录，会保留原分类、不重复添加；其余新条目放进上面选的分类。`
-          : `已关闭保留原分类：这 ${n} 个会在所选分类里再添加一份（原条目不动，可能出现重复）。`
-        : '桌面上这些都是新条目，会放进上面选的分类。'
+      for (const t of tags) t.hidden = !keep
     }
     cbKeep.addEventListener('change', syncLabels)
     syncLabels()
@@ -1046,13 +1032,9 @@ async function importFlow() {
     const cbMove = document.createElement('input')
     cbMove.type = 'checkbox'
     cbMove.checked = true
-    checkRow.append(cbMove, document.createTextNode('导入后把桌面上的原件移除（推荐，桌面就干净了）'))
+    checkRow.append(cbMove, document.createTextNode('导入后移除桌面原件'))
     body.appendChild(checkRow)
 
-    const tip = el('div', 'path-text')
-    tip.style.marginTop = '10px'
-    tip.textContent = '所有文件都会先完整复制到坞的数据目录，再移除桌面原件，不会丢。想复原可在设置里「把所有快捷方式放回桌面」。'
-    body.appendChild(tip)
     m.appendChild(body)
 
     const foot = el('div', 'modal-foot')

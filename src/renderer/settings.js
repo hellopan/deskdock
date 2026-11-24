@@ -23,6 +23,7 @@ let state = null
 let bindings = []
 let settingsTab = 'look'
 const tabScroll = new Map()
+let controlObservers = []
 
 /* ------------------------------------------------------------ 小工具 */
 
@@ -41,14 +42,19 @@ function toast(text, type) {
 let modalPrevFocus = null
 
 function closeModal() {
-  $('#mask').hidden = true
-  $('#modal').innerHTML = ''
-  if (modalPrevFocus && modalPrevFocus.isConnected) modalPrevFocus.focus({ preventScroll: true })
+  const previous = modalPrevFocus
   modalPrevFocus = null
+  document.querySelectorAll('.picker-menu').forEach((n) => n.remove())
+  window.glassUI.closeDialog($('#mask'), $('#modal'), () => {
+    $('#mask').hidden = true
+    $('#modal').innerHTML = ''
+    if (previous && previous.isConnected) previous.focus({ preventScroll: true })
+  })
 }
 
 function openModal(build) {
   const modal = $('#modal')
+  window.glassUI.openDialog($('#mask'), modal)
   modal.innerHTML = ''
   modalPrevFocus = document.activeElement
   const mask = $('#mask')
@@ -147,7 +153,6 @@ function row(label, desc) {
   const r = el('div', 'row')
   const box = el('div', 'rtext')
   box.appendChild(el('div', 'rlabel', label))
-  if (desc) box.appendChild(el('div', 'rdesc', desc))
   r.appendChild(box)
   return r
 }
@@ -158,6 +163,7 @@ function switchRow(label, desc, checked, onChange, key) {
   const input = document.createElement('input')
   input.type = 'checkbox'
   input.checked = !!checked
+  input.setAttribute('aria-label', label)
   const track = el('span', 'track')
   const knob = el('span', 'knob')
   sw.append(input, track, knob)
@@ -180,7 +186,10 @@ function rangeRow(label, min, max, step, value, fmt, onChange, key) {
   input.max = max
   input.step = step
   input.value = value
-  input.addEventListener('input', () => { val.textContent = fmt(Number(input.value)) })
+  input.setAttribute('aria-label', label)
+  const paintProgress = () => input.style.setProperty('--range-progress', ((Number(input.value) - min) / (max - min) * 100) + '%')
+  paintProgress()
+  input.addEventListener('input', () => { val.textContent = fmt(Number(input.value)); paintProgress() })
   input.addEventListener('change', () => onChange(Number(input.value)))
   wrap.append(top, input)
   wrap._input = input
@@ -189,6 +198,7 @@ function rangeRow(label, min, max, step, value, fmt, onChange, key) {
     bindings.push((s) => {
       const v = Number(s[key]) || 0
       input.value = v
+      paintProgress()
       val.textContent = fmt(v)
     })
   }
@@ -242,34 +252,27 @@ function stepperRow(label, desc, min, max, value, onChange, key) {
   return r
 }
 
-/** 置灰/恢复一行，并可附一句"为什么现在不能用"；说明只建一次，避免重复叠加 */
-function setRowDisabled(r, disabled, note) {
+/** 同步禁用状态。 */
+function setRowDisabled(r, disabled) {
   r.classList.toggle('is-disabled', disabled)
   r.querySelectorAll('button, input').forEach((n) => { n.disabled = disabled })
-  let n = r.querySelector('.rnote')
-  if (disabled && note) {
-    if (!n) {
-      n = el('div', 'rnote')
-      const box = r.querySelector('.rtext')
-      if (box) box.appendChild(n)
-      else r.appendChild(n)
-    }
-    n.textContent = note
-  } else if (n) {
-    n.remove()
-  }
   return r
 }
 
 function segRow(label, options, value, onChange, key) {
   const r = row(label)
   const seg = el('div', 'seg')
+  const paint = () => window.glassUI.capsule(seg, '.on')
+  const observer = new ResizeObserver(paint)
+  observer.observe(seg)
+  controlObservers.push(observer)
   const btns = []
   for (const opt of options) {
     const b = el('button', opt.value === value ? 'on' : '', opt.label)
     b.type = 'button'
     b.addEventListener('click', () => {
       btns.forEach((c) => c.classList.toggle('on', c === b))
+      paint()
       onChange(opt.value)
     })
     btns.push(b)
@@ -279,6 +282,7 @@ function segRow(label, options, value, onChange, key) {
   if (key) {
     bindings.push((s) => {
       btns.forEach((b, i) => b.classList.toggle('on', options[i].value === s[key]))
+      paint()
     })
   }
   return r
@@ -302,28 +306,35 @@ const TABS = [
 
 function renderTabs() {
   const bar = $('#settingsTabs')
-  bar.innerHTML = ''
   for (const t of TABS) {
+    let button = bar.querySelector('[data-tab="' + t.id + '"]')
+    if (!button) {
+      button = el('button', 'tab', t.label)
+      button.type = 'button'
+      button.dataset.tab = t.id
+      button.id = 'tab-' + t.id
+      button.setAttribute('role', 'tab')
+      button.setAttribute('aria-controls', 'settingsBody')
+      button.addEventListener('click', () => switchTab(t.id))
+      bar.appendChild(button)
+    }
     const active = t.id === settingsTab
-    const b = el('button', 'tab' + (active ? ' on' : ''), t.label)
-    b.type = 'button'
-    b.setAttribute('role', 'tab')
-    b.setAttribute('aria-selected', String(active))
-    // 只有当前页签在 Tab 序列里，其余靠左右方向键切换（WAI-ARIA 的 tabs 模式）
-    b.tabIndex = active ? 0 : -1
-    b.addEventListener('click', () => switchTab(t.id))
-    bar.appendChild(b)
+    button.classList.toggle('on', active)
+    button.setAttribute('aria-selected', String(active))
+    button.tabIndex = active ? 0 : -1
   }
+  window.glassUI.capsule(bar, '.on')
 }
+new ResizeObserver(() => window.glassUI.capsule($('#settingsTabs'), '.on')).observe($('#settingsTabs'))
 
-/** ←/→/Home/End 切页签；切完把焦点交给新的选中项（重建了按钮，必须重新聚焦） */
+/** 侧栏使用 ↑/↓/Home/End，兼容左右键切换。 */
 function onTabsKeydown(e) {
-  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return
+  if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return
   e.preventDefault()
   const i = TABS.findIndex((t) => t.id === settingsTab)
   let next = i
-  if (e.key === 'ArrowLeft') next = (i - 1 + TABS.length) % TABS.length
-  else if (e.key === 'ArrowRight') next = (i + 1) % TABS.length
+  if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') next = (i - 1 + TABS.length) % TABS.length
+  else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') next = (i + 1) % TABS.length
   else if (e.key === 'Home') next = 0
   else if (e.key === 'End') next = TABS.length - 1
   switchTab(TABS[next].id)
@@ -334,17 +345,22 @@ function onTabsKeydown(e) {
 function switchTab(id) {
   if (id === settingsTab) return
   tabScroll.set(settingsTab, $('#settingsBody').scrollTop)
+  const direction = TABS.findIndex(t => t.id === id) > TABS.findIndex(t => t.id === settingsTab) ? 1 : -1
   settingsTab = id
   renderTabs()
   renderTab()
+  window.glassUI.reveal($('#settingsBody .wrap'), direction)
 }
 
 function renderTab() {
   const body = $('#settingsBody')
+  controlObservers.forEach(observer => observer.disconnect())
+  controlObservers = []
   body.innerHTML = ''
   bindings = []     // 每次重建都重新登记，旧控件的同步函数不再调用
   const wrap = el('div', 'wrap')
   const tab = TABS.find((t) => t.id === settingsTab) || TABS[0]
+  body.setAttribute('aria-labelledby', 'tab-' + tab.id)
   tab.build(wrap)
   body.appendChild(wrap)
   body.scrollTop = tabScroll.get(tab.id) || 0
@@ -381,7 +397,7 @@ function buildLookTab(body) {
   ], s.theme, (v) => api.updateSettings({ theme: v }), 'theme'))
   g.appendChild(rangeRow('图标大小', 32, 64, 2, s.iconSize, fmtPx, (v) => api.updateSettings({ iconSize: v }), 'iconSize'))
   g.appendChild(rangeRow('磁贴宽度', 60, 104, 2, s.tileSize, fmtPx, (v) => api.updateSettings({ tileSize: v }), 'tileSize'))
-  const colsRow = stepperRow('每排图标个数', vertical ? '决定坞的宽度，改完立即生效' : '贴上/下边时按屏幕宽度自动排列', 4, 10, s.columns || 6, (v) => {
+  const colsRow = stepperRow('每排图标个数', vertical ? '决定坞的宽度，改完立即生效' : '贴上/下边时按屏幕宽度自动排列', 4, 20, s.columns || 6, (v) => {
     state.settings.columns = v
     api.updateSettings({ columns: v })
   }, 'columns')
@@ -432,7 +448,6 @@ function previewBlock() {
     box.appendChild(t)
   }
   g.appendChild(box)
-  g.appendChild(el('div', 'preview-note', '改上面的尺寸，坞会立刻跟着变；把鼠标移到图标上能看到悬停态'))
   return g
 }
 
@@ -473,21 +488,12 @@ function cooldownBlock(s) {
 /* ---------------------------------------------- 页签：行为 */
 function buildActionTab(body) {
   const s = state.settings
-  const vertical = s.edge === 'left' || s.edge === 'right'
-
   const g = group('贴边与尺寸')
   g.appendChild(segRow('贴边位置', [
     { value: 'left', label: '左' }, { value: 'right', label: '右' },
     { value: 'top', label: '上' }, { value: 'bottom', label: '下' }
   ], s.edge, (v) => api.updateSettings({ edge: v }), 'edge'))
-  const thickRow = rangeRow('坞的高度', 220, 460, 10, s.thickness, fmtPx, (v) => api.updateSettings({ thickness: v }), 'thickness')
-  g.appendChild(thickRow)
-  const syncThick = (st) => {
-    const v = st.edge === 'left' || st.edge === 'right'
-    setRowDisabled(thickRow, v, '当前贴左/右边，宽度由「每排图标个数」决定')
-  }
-  syncThick(s)
-  bindings.push(syncThick)
+  g.appendChild(rangeRow('坞的高度', 220, 1200, 10, s.panelHeight || 780, fmtPx, (v) => api.updateSettings({ panelHeight: v }), 'panelHeight'))
   body.appendChild(g)
 
   const g2 = group('显示与隐藏')
@@ -568,7 +574,7 @@ function buildDataTab(body) {
   )
   g2.appendChild(acts)
   if (state.missingCount > 0) {
-    g2.appendChild(el('div', 'warn-text', `当前有 ${state.missingCount} 个快捷方式指向的文件不存在，点「修复失效项」可以按原路径重建。`))
+    g2.appendChild(el('div', 'warn-text', `失效快捷方式：${state.missingCount} 个`))
   }
   body.appendChild(g2)
 
@@ -599,23 +605,11 @@ function buildAboutTab(body) {
   const g = group('关于')
   g.appendChild(el('div', 'about-name', '桌面坞 DeskDock'))
   g.appendChild(el('div', 'about-meta', `版本 ${state.appVersion}${state.isPackaged ? '' : ' · 开发模式'}`))
+  const github = el('a', 'about-link', 'github.com/hellopan/deskdock')
+  github.href = 'https://github.com/hellopan/deskdock'
+  github.addEventListener('click', (event) => { event.preventDefault(); api.openGitHub() })
+  g.appendChild(github)
   body.appendChild(g)
-
-  const g2 = group('操作提示')
-  const tips = el('div', 'tips')
-  for (const [k, v] of [
-    ['呼出', '鼠标滑到屏幕边缘停一下，坞会自动出现'],
-    ['换边', '拖动坞顶部的标题栏到另一条边，松手即吸附'],
-    ['分类', '点标题折叠/展开；拖分类行右侧的握把（或右键 → 上移/下移）可调整顺序'],
-    ['搜索', 'Ctrl+F 直接搜；Esc 逐层退出搜索、坞'],
-    ['设置', '这个窗口开着时坞会保持展开，关掉后恢复自动隐藏']
-  ]) {
-    const tip = el('div', 'tip')
-    tip.append(el('span', 'tip-k', k), el('span', 'tip-v', v))
-    tips.appendChild(tip)
-  }
-  g2.appendChild(tips)
-  body.appendChild(g2)
 
   const quit = el('button', 'btn sm mt-2', '退出桌面坞')
   quit.type = 'button'

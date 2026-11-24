@@ -250,8 +250,8 @@ function defaultConfig() {
       pinned: false,
       peek: 4,               // 隐藏后留在屏幕上的感应条宽度(px)
       hideDelay: 550,        // 鼠标移出后自动隐藏的延时(ms)
-      thickness: 330,        // 坞的厚度(px)，仅贴上下边时有效
-      columns: 6,            // 每排图标个数(4–10)，决定面板宽度
+      panelHeight: 780,      // 四个停靠方向共用的面板高度(px)
+      columns: 6,            // 每排图标个数(4–20)，决定面板宽度
       iconSize: 44,          // 图标尺寸(px)
       tileSize: 74,          // 磁贴宽度(px)
       theme: 'dark',         // dark | light
@@ -303,7 +303,8 @@ function normalize(raw) {
     for (const n of counts.values()) if (n > max) max = n
     settings.columns = max || base.settings.columns
   }
-  settings.columns = Math.max(4, Math.min(10, Math.round(Number(settings.columns) || 6)))
+  settings.panelHeight = Math.max(220, Math.min(1200, Math.round(Number(settings.panelHeight) || 780)))
+  settings.columns = Math.max(4, Math.min(20, Math.round(Number(settings.columns) || 6)))
 
   return { version: 1, settings, categories, items }
 }

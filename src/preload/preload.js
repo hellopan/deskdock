@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('dock', {
   loginState: () => ipcRenderer.invoke('settings:login-state'),
   openSettings: (tab) => ipcRenderer.invoke('settings:open', tab),
   closeSettings: () => ipcRenderer.invoke('settings:close'),
+  openGitHub: () => ipcRenderer.invoke('app:github'),
   setChrome: (theme) => ipcRenderer.invoke('settings:chrome', theme),
 
   /* 桌面导入 */

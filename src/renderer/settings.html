@@ -7,6 +7,7 @@
   <title>桌面坞设置</title>
   <link rel="stylesheet" href="tokens.css" />
   <link rel="stylesheet" href="settings.css" />
+  <link rel="stylesheet" href="glass.css" />
 </head>
 <body data-theme="dark">
   <div class="win">
@@ -32,7 +33,7 @@
       </div>
     </header>
 
-    <nav class="tabs" id="settingsTabs" role="tablist" aria-label="设置分类"></nav>
+    <nav class="tabs" id="settingsTabs" role="tablist" aria-orientation="vertical" aria-label="设置分类"></nav>
     <main class="body" id="settingsBody" role="tabpanel" tabindex="0"></main>
   </div>
 
@@ -41,6 +42,7 @@
   </div>
   <div class="toast-wrap" id="toasts"></div>
 
+  <script src="motion.js"></script>
   <script src="settings.js"></script>
 </body>
 </html>
